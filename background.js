@@ -1721,16 +1721,21 @@ async function fetchIncomeObjectsIncremental(token) {
       [];
     const arr = Array.isArray(objects) ? objects : (Array.isArray(objects?.objects) ? objects.objects : []);
     pagesFetched += 1;
+    let pageNewCount = 0;
 
     for (const item of arr) {
       const key = incomeObjectKey(item);
       if (knownKeys.has(key)) {
-        stoppedOnKnown = true;
-        firstKnownPage = pageNumber;
-        break;
+        continue;
       }
       knownKeys.add(key);
       newObjects.push(item);
+      pageNewCount += 1;
+    }
+
+    if (pageNewCount === 0 && cachedIncome.length) {
+      stoppedOnKnown = true;
+      firstKnownPage = pageNumber;
     }
 
     if (stoppedOnKnown || arr.length < pageSize) break;
