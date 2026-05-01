@@ -457,23 +457,36 @@ function incomeObjectKey(item) {
   return ["fallback", item?.date || "", modelKey, String(item?.royaltyAmount ?? ""), item?.regSite || ""].join("|");
 }
 
-function dedupeObjectsByKey(objects, keyFn) {
-  const seen = new Set();
+function buildObjectKeyCountMap(objects, keyFn) {
+  const counts = new Map();
+  for (const item of objects || []) {
+    const key = keyFn(item);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return counts;
+}
+
+function subtractObjectsByKeyMultiplicity(objects, preferredObjects, keyFn) {
+  const remaining = buildObjectKeyCountMap(preferredObjects, keyFn);
   const out = [];
   for (const item of objects || []) {
     const key = keyFn(item);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+    const left = key ? (remaining.get(key) || 0) : 0;
+    if (key && left > 0) {
+      if (left === 1) remaining.delete(key);
+      else remaining.set(key, left - 1);
+      continue;
+    }
     out.push(item);
   }
   return out;
 }
 
 function mergeSalesWithWithdrawPriority(incomeObjects, withdrawObjects) {
-  const dedupedWithdraw = dedupeObjectsByKey(withdrawObjects, incomeObjectKey);
-  const withdrawKeys = new Set(dedupedWithdraw.map(incomeObjectKey));
-  const filteredIncome = dedupeObjectsByKey((incomeObjects || []).filter((item) => !withdrawKeys.has(incomeObjectKey(item))), incomeObjectKey);
-  return [...filteredIncome, ...dedupedWithdraw];
+  const normalizedWithdraw = Array.isArray(withdrawObjects) ? [...withdrawObjects] : [];
+  const filteredIncome = subtractObjectsByKeyMultiplicity(incomeObjects, normalizedWithdraw, incomeObjectKey);
+  return [...filteredIncome, ...normalizedWithdraw];
 }
 
 function getMskNow() {

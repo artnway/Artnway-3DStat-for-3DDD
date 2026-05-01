@@ -206,6 +206,58 @@ function incomeObjectKey(o) {
     o?.regSite || ""
   ].join("|");
 }
+
+function buildObjectKeyCountMap(objects, keyFn) {
+  const counts = new Map();
+  for (const object of objects || []) {
+    const key = keyFn(object);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return counts;
+}
+
+function subtractObjectsByKeyMultiplicity(objects, preferredObjects, keyFn) {
+  const remaining = buildObjectKeyCountMap(preferredObjects, keyFn);
+  const out = [];
+  for (const object of objects || []) {
+    const key = keyFn(object);
+    const left = key ? (remaining.get(key) || 0) : 0;
+    if (key && left > 0) {
+      if (left === 1) remaining.delete(key);
+      else remaining.set(key, left - 1);
+      continue;
+    }
+    out.push(object);
+  }
+  return out;
+}
+
+function mergeObjectsByKeyMultiplicity(primaryObjects, secondaryObjects, keyFn) {
+  const out = Array.isArray(primaryObjects) ? [...primaryObjects] : [];
+  const primaryCounts = buildObjectKeyCountMap(primaryObjects, keyFn);
+  const keptSecondaryCounts = new Map();
+
+  for (const object of secondaryObjects || []) {
+    const key = keyFn(object);
+    if (!key) {
+      out.push(object);
+      continue;
+    }
+
+    const alreadyKept = keptSecondaryCounts.get(key) || 0;
+    const allowedFromSecondary = Math.max(0, (primaryCounts.get(key) || 0) - alreadyKept);
+    if (allowedFromSecondary > 0) {
+      keptSecondaryCounts.set(key, alreadyKept + 1);
+      continue;
+    }
+
+    out.push(object);
+  }
+
+  return out;
+}
+
 function dedupeObjectsByKey(objects, keyFn) {
   const seen = new Set();
   const out = [];
@@ -284,16 +336,12 @@ function compactWithdrawCacheMap(cacheMap) {
 }
 
 function mergeSalesWithWithdrawPriority(incomeObjects, withdrawObjects) {
-  const dedupedWithdraw = dedupeObjectsByKey(withdrawObjects, incomeObjectKey);
-  const withdrawKeys = new Set(dedupedWithdraw.map(incomeObjectKey));
-  const filteredIncome = dedupeObjectsByKey(
-    incomeObjects.filter(o => !withdrawKeys.has(incomeObjectKey(o))),
-    incomeObjectKey
-  );
+  const normalizedWithdraw = Array.isArray(withdrawObjects) ? [...withdrawObjects] : [];
+  const filteredIncome = subtractObjectsByKeyMultiplicity(incomeObjects, normalizedWithdraw, incomeObjectKey);
   return {
     incomeOnly: filteredIncome,
-    withdrawOnly: dedupedWithdraw,
-    combined: [...filteredIncome, ...dedupedWithdraw]
+    withdrawOnly: normalizedWithdraw,
+    combined: [...filteredIncome, ...normalizedWithdraw]
   };
 }
 function incMap(map, key, delta) {
@@ -1647,8 +1695,9 @@ async function fetchPagedObjects(token, endpoint, opts = null) {
 
 async function fetchIncomeObjectsIncremental(token) {
   const startedAt = Date.now();
-  const cachedIncome = dedupeIncomeObjects(await getIncomeCache());
-  const knownKeys = new Set(cachedIncome.map(incomeObjectKey));
+  const cachedIncome = await getIncomeCache();
+  const cachedKeyCounts = buildObjectKeyCountMap(cachedIncome, incomeObjectKey);
+  const seenKeyCounts = new Map();
   const pageSize = 200;
   let pageNumber = 1;
   let pagesFetched = 0;
@@ -1725,10 +1774,16 @@ async function fetchIncomeObjectsIncremental(token) {
 
     for (const item of arr) {
       const key = incomeObjectKey(item);
-      if (knownKeys.has(key)) {
+      if (!key) {
+        newObjects.push(item);
+        pageNewCount += 1;
         continue;
       }
-      knownKeys.add(key);
+      const seenCount = (seenKeyCounts.get(key) || 0) + 1;
+      seenKeyCounts.set(key, seenCount);
+      if (seenCount <= (cachedKeyCounts.get(key) || 0)) {
+        continue;
+      }
       newObjects.push(item);
       pageNewCount += 1;
     }
@@ -1743,13 +1798,13 @@ async function fetchIncomeObjectsIncremental(token) {
     if (pageNumber > 5000) break;
   }
 
-  const mergedObjects = dedupeIncomeObjects([...newObjects, ...cachedIncome]);
+  const mergedObjects = mergeObjectsByKeyMultiplicity(newObjects, cachedIncome, incomeObjectKey);
   if (newObjects.length || !cachedIncome.length) {
     await setIncomeCache(mergedObjects);
   }
 
-  const cachedKeys = new Set(cachedIncome.map(incomeObjectKey));
-  const networkKeys = new Set(newObjects.map(incomeObjectKey));
+  const cachedKeys = buildObjectKeyCountMap(cachedIncome, incomeObjectKey);
+  const networkKeys = buildObjectKeyCountMap(newObjects, incomeObjectKey);
 
   return {
     objects: mergedObjects,
@@ -1777,14 +1832,30 @@ function countObjectsByOrigin(objects, sourceKeySets) {
     network: 0,
     unknown: 0
   };
-  const cacheKeys = sourceKeySets?.cache || new Set();
-  const networkKeys = sourceKeySets?.network || new Set();
+  const cacheKeys = sourceKeySets?.cache || new Map();
+  const networkKeys = sourceKeySets?.network || new Map();
 
   for (const object of objects || []) {
     const key = incomeObjectKey(object);
-    if (networkKeys.has(key)) result.network += 1;
-    else if (cacheKeys.has(key)) result.cache += 1;
-    else result.unknown += 1;
+    if (!key) {
+      result.unknown += 1;
+      continue;
+    }
+    const networkLeft = networkKeys.get(key) || 0;
+    if (networkLeft > 0) {
+      result.network += 1;
+      if (networkLeft === 1) networkKeys.delete(key);
+      else networkKeys.set(key, networkLeft - 1);
+      continue;
+    }
+    const cacheLeft = cacheKeys.get(key) || 0;
+    if (cacheLeft > 0) {
+      result.cache += 1;
+      if (cacheLeft === 1) cacheKeys.delete(key);
+      else cacheKeys.set(key, cacheLeft - 1);
+      continue;
+    }
+    result.unknown += 1;
   }
 
   return result;
@@ -2000,11 +2071,12 @@ async function fetchAllData(token) {
     const pages = results.reduce((s, r) => s + r.localPages, 0);
     const err = results.map(r => r.localErr).join("").trim();
     const perIdMs = Object.assign({}, ...results.map(r => r.localPerIdMs));
-    const cachedKeys = new Set(cachedObjects.map(incomeObjectKey));
-    const networkKeys = new Set(fetchedAll.map(incomeObjectKey));
+    const mergedWithdrawObjects = mergeObjectsByKeyMultiplicity(fetchedAll, cachedObjects, incomeObjectKey);
+    const cachedKeys = buildObjectKeyCountMap(cachedObjects, incomeObjectKey);
+    const networkKeys = buildObjectKeyCountMap(fetchedAll, incomeObjectKey);
 
     withdraw = {
-      objects: [...cachedObjects, ...fetchedAll],
+      objects: mergedWithdrawObjects,
       pagesFetched: pages,
       error: networkAbortError
         ? `Не все данные withdraw_stat удалось восстановить после сетевого сбоя. Уже собранная часть сохранена в кэш.${degradedToSingle ? " Во время восстановления параллелизм был снижен." : ""}\n${err}`.trim()
@@ -3132,7 +3204,7 @@ async function setIncomeCache(objects) {
 }
 
 async function getCachedSalesPayload() {
-  const incomeObjects = dedupeIncomeObjects(await getIncomeCache());
+  const incomeObjects = await getIncomeCache();
   const withdrawById = await getWithdrawStatCache();
   const withdrawObjects = Object.values(withdrawById)
     .flatMap((entry) => Array.isArray(entry?.objects) ? entry.objects : []);
