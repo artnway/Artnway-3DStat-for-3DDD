@@ -1,0 +1,471 @@
+/* Theme Tokens: 3DDD Light */
+:root {
+  /* Base */
+  --bg:#ffffff;
+  --surface:#ffffff;
+  --surface-soft:#f8fafc;
+  --surface-muted:#f8fafc;
+  --surface-strong:#ffffff;
+  --surface-glass:rgba(255,255,255,0.72);
+  --surface-glass-strong:rgba(255,255,255,0.95);
+  --text:#0f172a;
+  --muted:#64748b;
+  --border:#e2e8f0;
+  --border-soft:#edf2f7;
+  --line-soft:#f1f5f9;
+
+  /* Accent & feedback */
+  --accent:#0f172a;
+  --accent-soft:#f1f5f9;
+  --brand-bg:#0f172a;
+  --brand-fg:#ffffff;
+  --ok:#047857;
+  --ok-bg:#ecfdf5;
+  --danger:#dc2626;
+  --danger-bg:#fff1f2;
+
+  /* Status & progress */
+  --status-border:#f1f5f9;
+  --status-bg:rgba(248, 250, 252, 0.92);
+  --status-live-bg:#f8fafc;
+  --status-main:#334155;
+  --progress-track:#e2e8f0;
+  --progress-fill-start:#64748b;
+  --progress-fill-end:#0f172a;
+
+  /* Chart */
+  --chart-grid:#e7e7e7;
+  --chart-axis:#565656;
+  --chart-fill-start:rgba(17,17,17,0.16);
+  --chart-fill-end:rgba(17,17,17,0.02);
+  --chart-line:#2f2f2f;
+  --chart-point:#111111;
+  --chart-avg-line:rgba(100,116,139,0.75);
+  --chart-trend-line:rgba(71,85,105,0.82);
+  --chart-select-line:rgba(60,60,60,0.22);
+  --chart-select-fill:#ffffff;
+  --chart-select-stroke:#2f2f2f;
+  --chart-x-axis:#5f5f5f;
+  --mini-bar:#d1d5db;
+  --chart-summary-bg:#f1f5f9;
+  --chart-summary-border:#dbe4ef;
+  --chart-summary-text:#334155;
+
+  /* Tooltip */
+  --tooltip-bg:rgba(255,255,255,0.98);
+  --tooltip-border:rgba(226,232,240,0.95);
+  --tooltip-date:#0f172a;
+  --tooltip-text:#64748b;
+  --tooltip-shadow:0 22px 48px rgba(15,23,42,0.1);
+
+  /* Viewport */
+  --viewport-border:rgba(148, 163, 184, 0.8);
+  --viewport-fill:rgba(255,255,255,0.58);
+  --viewport-inset:rgba(255,255,255,0.7);
+  --viewport-outline:rgba(148,163,184,0.22);
+  --handle-bg:rgba(255,255,255,0.9);
+  --handle-border:rgba(148,163,184,0.45);
+  --handle-shadow:0 4px 12px rgba(15,23,42,0.06);
+  --handle-highlight:rgba(255,255,255,0.55);
+  --grip:#0f172a;
+
+  /* Controls */
+  --tab-active-bg:#eef2f7;
+  --tab-active-text:#0f172a;
+  --tab-active-border:#b8c6d8;
+  --control-bg:#ffffff;
+  --control-text:#334155;
+  --control-border:#e2e8f0;
+  --control-hover-bg:#f8fafc;
+  --control-hover-text:#0f172a;
+  --control-hover-border:#cbd5e1;
+  --control-shadow:0 10px 24px rgba(15,23,42,0.045);
+  --control-shadow-hover:0 16px 34px rgba(15,23,42,0.065);
+  --control-active-bg:#eef2f7;
+  --control-active-text:#0f172a;
+  --control-active-border:#b8c6d8;
+  --control-active-shadow:0 16px 34px rgba(15,23,42,0.075);
+  --primary-control-bg:var(--brand-bg);
+  --primary-control-text:var(--brand-fg);
+  --primary-control-border:var(--brand-bg);
+  --primary-control-hover-bg:#1e293b;
+  --primary-control-hover-text:#ffffff;
+  --primary-control-hover-border:#1e293b;
+
+  /* Settings */
+  --settings-choice-hover-border:#cbd5e1;
+  --settings-choice-active-border:#94a3b8;
+  --settings-choice-hover-shadow:0 14px 30px rgba(15,23,42,0.05);
+  --settings-choice-active-shadow:0 16px 34px rgba(15,23,42,0.065);
+  --settings-chip-icon-bg:rgba(255,255,255,0.9);
+  --settings-donut-secondary:#dbe4ef;
+  --settings-donut-center-start:#ffffff;
+  --settings-donut-center-end:#f8fafc;
+  --settings-donut-text:#334155;
+  --settings-legend-text:#475569;
+  --settings-thumb-start:#dbeafe;
+  --settings-thumb-end:#bfdbfe;
+  --settings-debug-bg:#ffffff;
+  --settings-debug-text:#0f172a;
+  --settings-debug-border:#dbe4ef;
+  --settings-toggle-track:#e2e8f0;
+  --settings-toggle-knob:#ffffff;
+  --settings-toggle-active:#4cd964;
+  --settings-rank-center-bg:#ffffff;
+  --settings-rank-center-text:#0f172a;
+  --settings-rank-fallback-bg:#f8fafc;
+}
+
+/* Theme Tokens: 3DDD Navy */
+body[data-theme="ddd-navy"] {
+  /* Base */
+  --bg:#0b1220;
+  --surface:#111827;
+  --surface-soft:#172033;
+  --surface-muted:#172033;
+  --surface-strong:#111827;
+  --surface-glass:rgba(23,32,51,0.78);
+  --surface-glass-strong:rgba(17,24,39,0.95);
+  --text:#e5eefb;
+  --muted:#94a3b8;
+  --border:#2b3542;
+  --border-soft:#263244;
+  --line-soft:#233046;
+
+  /* Accent & feedback */
+  --accent:#e5eefb;
+  --accent-soft:#1f2937;
+  --brand-bg:#e5eefb;
+  --brand-fg:#0f172a;
+  --ok:#34d399;
+  --ok-bg:rgba(52, 211, 153, 0.14);
+  --danger:#f87171;
+  --danger-bg:rgba(248, 113, 113, 0.14);
+
+  /* Status & progress */
+  --status-border:#233046;
+  --status-bg:rgba(23, 32, 51, 0.92);
+  --status-live-bg:#172033;
+  --status-main:#cbd5e1;
+  --progress-track:#233046;
+  --progress-fill-start:#94a3b8;
+  --progress-fill-end:#e5eefb;
+
+  /* Chart */
+  --chart-grid:#334155;
+  --chart-axis:#94a3b8;
+  --chart-fill-start:rgba(229,238,251,0.14);
+  --chart-fill-end:rgba(229,238,251,0.02);
+  --chart-line:#e5eefb;
+  --chart-point:#f8fafc;
+  --chart-avg-line:rgba(148,163,184,0.78);
+  --chart-trend-line:rgba(148,163,184,0.84);
+  --chart-select-line:rgba(203,213,225,0.22);
+  --chart-select-fill:#111827;
+  --chart-select-stroke:#e5eefb;
+  --chart-x-axis:#94a3b8;
+  --mini-bar:#475569;
+  --chart-summary-bg:#172033;
+  --chart-summary-border:#3b475c;
+  --chart-summary-text:#cbd5e1;
+
+  /* Tooltip */
+  --tooltip-bg:rgba(17,24,39,0.98);
+  --tooltip-border:rgba(71,85,105,0.85);
+  --tooltip-date:#f8fafc;
+  --tooltip-text:#94a3b8;
+  --tooltip-shadow:0 24px 52px rgba(2,6,23,0.34);
+
+  /* Viewport */
+  --viewport-border:rgba(100,116,139,0.85);
+  --viewport-fill:rgba(15,23,42,0.48);
+  --viewport-inset:rgba(148,163,184,0.12);
+  --viewport-outline:rgba(148,163,184,0.16);
+  --handle-bg:rgba(30,41,59,0.95);
+  --handle-border:rgba(100,116,139,0.6);
+  --handle-shadow:0 4px 12px rgba(2,6,23,0.22);
+  --handle-highlight:rgba(226,232,240,0.22);
+  --grip:#cbd5e1;
+
+  /* Controls */
+  --tab-active-bg:#0b1220;
+  --tab-active-text:#e5eefb;
+  --tab-active-border:#475569;
+  --control-bg:#111827;
+  --control-text:#cbd5e1;
+  --control-border:#334155;
+  --control-hover-bg:#172033;
+  --control-hover-text:#f8fafc;
+  --control-hover-border:#586981;
+  --control-shadow:0 10px 24px rgba(2,6,23,0.18);
+  --control-shadow-hover:0 16px 34px rgba(2,6,23,0.26);
+  --control-active-bg:#1b2436;
+  --control-active-text:#f8fafc;
+  --control-active-border:#6f839f;
+  --control-active-shadow:0 16px 34px rgba(2,6,23,0.28);
+  --primary-control-bg:var(--brand-bg);
+  --primary-control-text:var(--brand-fg);
+  --primary-control-border:var(--brand-bg);
+  --primary-control-hover-bg:#f8fafc;
+  --primary-control-hover-text:#0f172a;
+  --primary-control-hover-border:#f8fafc;
+
+  /* Settings */
+  --settings-choice-hover-border:#475569;
+  --settings-choice-active-border:#586981;
+  --settings-choice-hover-shadow:0 14px 30px rgba(2,6,23,0.2);
+  --settings-choice-active-shadow:0 16px 34px rgba(2,6,23,0.26);
+  --settings-chip-icon-bg:rgba(30,41,59,0.95);
+  --settings-donut-secondary:#334155;
+  --settings-donut-center-start:#172033;
+  --settings-donut-center-end:#111827;
+  --settings-donut-text:#cbd5e1;
+  --settings-legend-text:#94a3b8;
+  --settings-thumb-start:#233046;
+  --settings-thumb-end:#172033;
+  --settings-debug-bg:#020617;
+  --settings-debug-text:#cbd5e1;
+  --settings-debug-border:#334155;
+  --settings-toggle-track:#334155;
+  --settings-toggle-knob:#e5eefb;
+  --settings-toggle-active:#4cd964;
+  --settings-rank-center-bg:#111827;
+  --settings-rank-center-text:#e5eefb;
+  --settings-rank-fallback-bg:#172033;
+}
+
+/* Theme Tokens: 3DDD Pinky */
+body[data-theme="ddd-pinky"] {
+  /* Base */
+  --bg:#fff7fa;
+  --surface:#ffffff;
+  --surface-soft:#fff1f5;
+  --surface-muted:#fff1f5;
+  --surface-strong:#fffafb;
+  --surface-glass:rgba(255,250,251,0.78);
+  --surface-glass-strong:rgba(255,250,251,0.95);
+  --text:#6d2d44;
+  --muted:#9a6a7d;
+  --border:#f0d8e1;
+  --border-soft:#f6e6ed;
+  --line-soft:#f6e6ed;
+
+  /* Accent & feedback */
+  --accent:#c45a7a;
+  --accent-soft:#ffe7ef;
+  --brand-bg:#c45a7a;
+  --brand-fg:#fffafb;
+  --ok:#4e9b73;
+  --ok-bg:#edf9f1;
+  --danger:#c45a7a;
+  --danger-bg:#ffe8ef;
+
+  /* Status & progress */
+  --status-border:#f3dce5;
+  --status-bg:rgba(255, 245, 248, 0.94);
+  --status-live-bg:#fff1f5;
+  --status-main:#8b4c63;
+  --progress-track:#f0d8e1;
+  --progress-fill-start:#e8a1ba;
+  --progress-fill-end:#c45a7a;
+
+  /* Chart */
+  --chart-grid:#eed6df;
+  --chart-axis:#9a6a7d;
+  --chart-fill-start:rgba(196,90,122,0.14);
+  --chart-fill-end:rgba(196,90,122,0.02);
+  --chart-line:#b84e70;
+  --chart-point:#9f4462;
+  --chart-avg-line:rgba(154,106,125,0.76);
+  --chart-trend-line:rgba(154,106,125,0.8);
+  --chart-select-line:rgba(196,90,122,0.18);
+  --chart-select-fill:#fffafb;
+  --chart-select-stroke:#b84e70;
+  --chart-x-axis:#9a6a7d;
+  --mini-bar:#efc8d6;
+  --chart-summary-bg:#fff1f5;
+  --chart-summary-border:#f0d8e1;
+  --chart-summary-text:#8b4c63;
+
+  /* Tooltip */
+  --tooltip-bg:rgba(255,250,251,0.98);
+  --tooltip-border:rgba(240,216,225,0.98);
+  --tooltip-date:#7a3550;
+  --tooltip-text:#9a6a7d;
+  --tooltip-shadow:0 22px 48px rgba(196,90,122,0.12);
+
+  /* Viewport */
+  --viewport-border:rgba(196, 90, 122, 0.55);
+  --viewport-fill:rgba(255,255,255,0.58);
+  --viewport-inset:rgba(255,255,255,0.72);
+  --viewport-outline:rgba(196,90,122,0.12);
+  --handle-bg:rgba(255,255,255,0.95);
+  --handle-border:rgba(196,90,122,0.28);
+  --handle-shadow:0 4px 12px rgba(196,90,122,0.09);
+  --handle-highlight:rgba(255,255,255,0.6);
+  --grip:#8b4c63;
+
+  /* Controls */
+  --tab-active-bg:#ffdce8;
+  --tab-active-text:#8b3d59;
+  --tab-active-border:#e3aac0;
+  --control-bg:#fffafb;
+  --control-text:#8b4c63;
+  --control-border:#f0d8e1;
+  --control-hover-bg:#fff1f5;
+  --control-hover-text:#7a3550;
+  --control-hover-border:#e6c2cf;
+  --control-shadow:0 10px 24px rgba(196,90,122,0.07);
+  --control-shadow-hover:0 16px 34px rgba(196,90,122,0.1);
+  --control-active-bg:#ffdce8;
+  --control-active-text:#8b3d59;
+  --control-active-border:#e3aac0;
+  --control-active-shadow:0 16px 34px rgba(196,90,122,0.11);
+  --primary-control-bg:var(--brand-bg);
+  --primary-control-text:var(--brand-fg);
+  --primary-control-border:var(--brand-bg);
+  --primary-control-hover-bg:#b84e70;
+  --primary-control-hover-text:#fffafb;
+  --primary-control-hover-border:#b84e70;
+
+  /* Settings */
+  --settings-choice-hover-border:#e6c2cf;
+  --settings-choice-active-border:#d99ab0;
+  --settings-choice-hover-shadow:0 14px 30px rgba(196,90,122,0.08);
+  --settings-choice-active-shadow:0 16px 34px rgba(196,90,122,0.1);
+  --settings-chip-icon-bg:rgba(255,255,255,0.92);
+  --settings-donut-secondary:#f0d8e1;
+  --settings-donut-center-start:#fffafb;
+  --settings-donut-center-end:#fff1f5;
+  --settings-donut-text:#8b4c63;
+  --settings-legend-text:#9a6a7d;
+  --settings-thumb-start:#ffd8e5;
+  --settings-thumb-end:#f4bccf;
+  --settings-debug-bg:#fff1f5;
+  --settings-debug-text:#7a3550;
+  --settings-debug-border:#f0d8e1;
+  --settings-toggle-track:#f0d8e1;
+  --settings-toggle-knob:#ffffff;
+  --settings-toggle-active:#d98ea8;
+  --settings-rank-center-bg:#fffafb;
+  --settings-rank-center-text:#8b4c63;
+  --settings-rank-fallback-bg:#fff1f5;
+}
+
+/* Theme Tokens: 3DDD Dark */
+body[data-theme="ddd-dark"] {
+  /* Base */
+  --bg:#1f2020;
+  --surface:#2b2b2b;
+  --surface-soft:#3c3c3c;
+  --surface-muted:#3c3c3c;
+  --surface-strong:#2b2b2b;
+  --surface-glass:rgba(43,43,43,0.8);
+  --surface-glass-strong:rgba(43,43,43,0.95);
+  --text:#f1f1f1;
+  --muted:#b3b3b3;
+  --border:#3c3c3c;
+  --border-soft:#4a4a4a;
+  --line-soft:#3c3c3c;
+
+  /* Accent & feedback */
+  --accent:#f1f1f1;
+  --accent-soft:#343434;
+  --brand-bg:#f1f1f1;
+  --brand-fg:#1f2020;
+  --ok:#a8d5b0;
+  --ok-bg:rgba(168, 213, 176, 0.14);
+  --danger:#e0a6a6;
+  --danger-bg:rgba(224, 166, 166, 0.14);
+
+  /* Status & progress */
+  --status-border:#3c3c3c;
+  --status-bg:rgba(43, 43, 43, 0.92);
+  --status-live-bg:#2b2b2b;
+  --status-main:#d2d2d2;
+  --progress-track:#3c3c3c;
+  --progress-fill-start:#808080;
+  --progress-fill-end:#f1f1f1;
+
+  /* Chart */
+  --chart-grid:#4a4a4a;
+  --chart-axis:#b3b3b3;
+  --chart-fill-start:rgba(241,241,241,0.10);
+  --chart-fill-end:rgba(241,241,241,0.02);
+  --chart-line:#e0e0e0;
+  --chart-point:#f5f5f5;
+  --chart-avg-line:rgba(179,179,179,0.78);
+  --chart-trend-line:rgba(163,163,163,0.84);
+  --chart-select-line:rgba(212,212,212,0.18);
+  --chart-select-fill:#2b2b2b;
+  --chart-select-stroke:#e0e0e0;
+  --chart-x-axis:#b3b3b3;
+  --mini-bar:#666666;
+  --chart-summary-bg:#343434;
+  --chart-summary-border:#4a4a4a;
+  --chart-summary-text:#d2d2d2;
+
+  /* Tooltip */
+  --tooltip-bg:rgba(43,43,43,0.98);
+  --tooltip-border:rgba(90,90,90,0.85);
+  --tooltip-date:#f5f5f5;
+  --tooltip-text:#b3b3b3;
+  --tooltip-shadow:0 24px 52px rgba(0,0,0,0.34);
+
+  /* Viewport */
+  --viewport-border:rgba(128,128,128,0.85);
+  --viewport-fill:rgba(31,32,32,0.48);
+  --viewport-inset:rgba(128,128,128,0.12);
+  --viewport-outline:rgba(128,128,128,0.16);
+  --handle-bg:rgba(60,60,60,0.95);
+  --handle-border:rgba(128,128,128,0.6);
+  --handle-shadow:0 4px 12px rgba(0,0,0,0.22);
+  --handle-highlight:rgba(241,241,241,0.18);
+  --grip:#d2d2d2;
+
+  /* Controls */
+  --tab-active-bg:#1f2020;
+  --tab-active-text:#f1f1f1;
+  --tab-active-border:#5a5a5a;
+  --control-bg:#2b2b2b;
+  --control-text:#d2d2d2;
+  --control-border:#3c3c3c;
+  --control-hover-bg:#343434;
+  --control-hover-text:#f1f1f1;
+  --control-hover-border:#5a5a5a;
+  --control-shadow:0 10px 24px rgba(0,0,0,0.16);
+  --control-shadow-hover:0 16px 34px rgba(0,0,0,0.24);
+  --control-active-bg:#3c3c3c;
+  --control-active-text:#f1f1f1;
+  --control-active-border:#808080;
+  --control-active-shadow:0 16px 34px rgba(0,0,0,0.25);
+  --primary-control-bg:var(--brand-bg);
+  --primary-control-text:var(--brand-fg);
+  --primary-control-border:var(--brand-bg);
+  --primary-control-hover-bg:#d8d8d8;
+  --primary-control-hover-text:#1f2020;
+  --primary-control-hover-border:#d8d8d8;
+
+  /* Settings */
+  --settings-choice-hover-border:#5a5a5a;
+  --settings-choice-active-border:#808080;
+  --settings-choice-hover-shadow:0 14px 30px rgba(0,0,0,0.18);
+  --settings-choice-active-shadow:0 16px 34px rgba(0,0,0,0.24);
+  --settings-chip-icon-bg:rgba(60,60,60,0.95);
+  --settings-donut-secondary:#5a5a5a;
+  --settings-donut-center-start:#343434;
+  --settings-donut-center-end:#2b2b2b;
+  --settings-donut-text:#d2d2d2;
+  --settings-legend-text:#b3b3b3;
+  --settings-thumb-start:#4a4a4a;
+  --settings-thumb-end:#3c3c3c;
+  --settings-debug-bg:#1a1a1a;
+  --settings-debug-text:#d2d2d2;
+  --settings-debug-border:#4a4a4a;
+  --settings-toggle-track:#4a4a4a;
+  --settings-toggle-knob:#f1f1f1;
+  --settings-toggle-active:#808080;
+  --settings-rank-center-bg:#2b2b2b;
+  --settings-rank-center-text:#f1f1f1;
+  --settings-rank-fallback-bg:#343434;
+}

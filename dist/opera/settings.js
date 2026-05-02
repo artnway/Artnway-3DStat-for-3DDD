@@ -1,4 +1,5 @@
 // ===== Settings constants & runtime state =====
+const extApi = globalThis.browser || globalThis.chrome;
 const APP_SETTINGS_KEY = "appSettings";
 const UI_LANGUAGE_KEY = "uiLanguage";
 const WITHDRAW_CACHE_INDEX_KEY = "cachedWithdrawStatIndex";
@@ -47,6 +48,63 @@ let cachedSalesObjects = [];
 let currentLanguage = "ru";
 let currentFrontendBaseUrl = "https://3ddd.ru";
 let currentLanguageMode = "auto";
+
+function isPromiseLike(value) {
+  return !!value && typeof value.then === "function";
+}
+
+function getChromeRuntimeLastErrorMessage() {
+  return String(globalThis.chrome?.runtime?.lastError?.message || "");
+}
+
+async function storageGet(keys) {
+  if ((globalThis.browser && extApi === globalThis.browser) || extApi.storage?.local?.get?.length <= 1) {
+    return await extApi.storage.local.get(keys);
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.storage.local.get(keys, (result) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(result || {});
+    });
+  });
+}
+
+async function storageSet(payload) {
+  if ((globalThis.browser && extApi === globalThis.browser) || extApi.storage?.local?.set?.length <= 1) {
+    return await extApi.storage.local.set(payload);
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.storage.local.set(payload, () => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function sendRuntimeMessage(message) {
+  const result = extApi.runtime.sendMessage(message);
+  if (isPromiseLike(result)) {
+    return await result;
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.runtime.sendMessage(message, (response) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
 
 const I18N = {
   ru: {
@@ -363,7 +421,7 @@ function localizeRankTitle(rank) {
 
 async function loadFrontendLanguage() {
   try {
-    const stored = await chrome.storage.local.get(["frontendBaseUrl", UI_LANGUAGE_KEY]);
+    const stored = await storageGet(["frontendBaseUrl", UI_LANGUAGE_KEY]);
     currentFrontendBaseUrl = normalizeFrontendBaseUrl(stored?.frontendBaseUrl || "");
     currentLanguageMode = ["auto", "ru", "en"].includes(stored?.[UI_LANGUAGE_KEY]) ? stored[UI_LANGUAGE_KEY] : "auto";
     currentLanguage = resolveLanguage(currentFrontendBaseUrl, currentLanguageMode);
@@ -589,17 +647,17 @@ function applySettingsState(input) {
 }
 
 async function loadSettings() {
-  const stored = await chrome.storage.local.get([APP_SETTINGS_KEY]);
+  const stored = await storageGet([APP_SETTINGS_KEY]);
   const normalized = applySettingsState(stored?.[APP_SETTINGS_KEY] || {});
   if (normalized.needsSave) {
-    await chrome.storage.local.set({ [APP_SETTINGS_KEY]: currentSettings });
+    await storageSet({ [APP_SETTINGS_KEY]: currentSettings });
   }
   return currentSettings;
 }
 
 async function loadCachedDashboard() {
   try {
-    const resp = await chrome.runtime.sendMessage({ type: "GET_CACHED" });
+    const resp = await sendRuntimeMessage({ type: "GET_CACHED" });
     cachedDashboard = resp?.ok ? (resp.dashboard || null) : null;
   } catch {
     cachedDashboard = null;
@@ -609,7 +667,7 @@ async function loadCachedDashboard() {
 
 async function loadCachedSalesObjects() {
   try {
-    const resp = await chrome.runtime.sendMessage({ type: "GET_CACHED_SALES_OBJECTS" });
+    const resp = await sendRuntimeMessage({ type: "GET_CACHED_SALES_OBJECTS" });
     cachedSalesObjects = Array.isArray(resp?.data?.combinedObjects) ? resp.data.combinedObjects : [];
   } catch {
     cachedSalesObjects = [];
@@ -619,7 +677,7 @@ async function loadCachedSalesObjects() {
 
 async function persistSettings(patch) {
   applySettingsState(Object.assign({}, currentSettings, patch || {}));
-  await chrome.storage.local.set({ [APP_SETTINGS_KEY]: currentSettings });
+  await storageSet({ [APP_SETTINGS_KEY]: currentSettings });
   flashSaved();
 }
 
@@ -1846,7 +1904,7 @@ async function loadDebugInfo() {
     logNode.textContent = tr("debugLoading");
   }
   try {
-    const resp = await chrome.runtime.sendMessage({ type: "GET_DEBUG_INFO" });
+    const resp = await sendRuntimeMessage({ type: "GET_DEBUG_INFO" });
     if (!resp?.ok) throw new Error(resp?.error || tr("debugFetchFailed"));
     logNode.dataset.copyText = formatDebugPayload(resp.data);
     logNode.innerHTML = formatDebugHtml(resp.data);
@@ -1932,7 +1990,7 @@ function bindLanguageButton() {
     applySettingsLocale();
     refreshSettingsUI({ rerenderTopBlocks: true });
     flashSaved(tr("languageChanged", { mode: tr(`languageMode${nextMode[0].toUpperCase()}${nextMode.slice(1)}`) }));
-    await chrome.storage.local.set({ [UI_LANGUAGE_KEY]: nextMode });
+    await storageSet({ [UI_LANGUAGE_KEY]: nextMode });
   });
 }
 
@@ -1965,7 +2023,7 @@ async function initializeSettingsPage() {
 // ===== Bootstrap =====
 window.addEventListener("resize", () => renderChartPreviews());
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
+extApi.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
   const hasWithdrawCacheChange = Object.keys(changes || {}).some((key) => key === WITHDRAW_CACHE_INDEX_KEY || key === WITHDRAW_CACHE_LEGACY_KEY || key.startsWith(WITHDRAW_CACHE_PREFIX));
   if (changes.frontendBaseUrl || changes[UI_LANGUAGE_KEY]) {

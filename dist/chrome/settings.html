@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3DStat — Настройки</title>
+  <link rel="stylesheet" href="themes.css" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="hero">
+      <div>
+        <h1 class="hero-title hero-title-with-icon"><img class="hero-title-icon" src="icons/Icon.png" alt="" /><span id="settingsHeroTitle">Настройки приложения</span></h1>
+        <p class="hero-sub" id="settingsHeroSub">Здесь собраны визуальные и диагностические настройки приложения: темы, верхние блоки, стиль графика и инструменты для диагностики.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="tiny-btn lang-toggle" id="langBtn" type="button" aria-label="Переключить язык">AUTO</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card full">
+        <h2 class="card-title" id="topBlocksTitle">Блоки вверху приложения</h2>
+        <p class="card-sub" id="topBlocksSub">Можно выбрать только 2 блока.</p>
+        <div class="choice-grid blocks" id="topBlockChoices"></div>
+      </section>
+
+      <section class="card full">
+        <h2 class="card-title" id="themesTitle">Цвета</h2>
+        <p class="card-sub" id="themesSub">Четыре базовые темы: светлая палитра 3DDD, глубокая Navy, нейтральная Dark и нежная Pinky.</p>
+        <div class="choice-grid choice-grid-themes" id="colorChoices">
+          <button class="choice" type="button" data-setting="theme" data-value="ddd-light">
+            <div class="choice-title">Light</div>
+            <div class="color-preview">
+              <div class="color-header ddd-light"></div>
+              <div class="color-card">
+                <div>
+                  <div class="color-card-label" id="themeLightMetric">Заработано сегодня</div>
+                  <div class="color-card-number">115,30</div>
+                </div>
+                <div class="mini-badge down" style="color:#dc2626; background:#fff1f2">↓ -75%</div>
+              </div>
+              <div class="color-chart-preview">
+                <div class="color-chart-line">
+                  <svg viewBox="0 0 220 60" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M0 48 C20 38, 38 40, 58 22 S96 14, 118 28 S158 40, 182 20 S206 16, 220 8" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </button>
+          <button class="choice" type="button" data-setting="theme" data-value="ddd-pinky">
+            <div class="choice-title">Pinky</div>
+            <div class="color-preview pinky">
+              <div class="color-header ddd-pinky"></div>
+              <div class="color-card pinky">
+                <div>
+                  <div class="color-card-label pinky" id="themePinkyMetric">Заработано сегодня</div>
+                  <div class="color-card-number pinky">115,30</div>
+                </div>
+                <div class="mini-badge down" style="color:#c45a7a; background:rgba(255, 214, 226, 0.8)">↓ -8%</div>
+              </div>
+              <div class="color-chart-preview pinky">
+                <div class="color-chart-line">
+                  <svg viewBox="0 0 220 60" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M0 46 C18 34, 36 38, 54 22 S92 12, 118 24 S160 36, 184 22 S206 18, 220 10" fill="none" stroke="#c45a7a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </button>
+          <button class="choice" type="button" data-setting="theme" data-value="ddd-navy">
+            <div class="choice-title">Navy</div>
+            <div class="color-preview navy">
+              <div class="color-header ddd-navy"></div>
+              <div class="color-card navy">
+                <div>
+                  <div class="color-card-label navy" id="themeNavyMetric">Заработано за 7 дней</div>
+                  <div class="color-card-number navy">3 730,86</div>
+                </div>
+                <div class="mini-badge" style="color:#34d399; background:rgba(52, 211, 153, 0.14)">↑ +12%</div>
+              </div>
+              <div class="color-chart-preview navy">
+                <div class="color-chart-line">
+                  <svg viewBox="0 0 220 60" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M0 44 C18 34, 34 36, 52 20 S90 12, 116 24 S158 38, 180 22 S204 18, 220 12" fill="none" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </button>
+          <button class="choice" type="button" data-setting="theme" data-value="ddd-dark">
+            <div class="choice-title">Dark</div>
+            <div class="color-preview dark">
+              <div class="color-header ddd-dark"></div>
+              <div class="color-card dark">
+                <div>
+                  <div class="color-card-label dark" id="themeDarkMetric">Заработано за 30 дней</div>
+                  <div class="color-card-number dark">17 936,95</div>
+                </div>
+                <div class="mini-badge" style="color:#d4d4d4; background:rgba(128, 128, 128, 0.16)">↓ -4%</div>
+              </div>
+              <div class="color-chart-preview dark">
+                <div class="color-chart-line">
+                  <svg viewBox="0 0 220 60" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M0 42 C18 30, 38 34, 58 22 S96 16, 118 26 S160 38, 184 24 S206 18, 220 14" fill="none" stroke="#d8d8d8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <section class="card full">
+        <h2 class="card-title" id="chartStyleTitle">Стиль графика</h2>
+        <p class="card-sub" id="chartStyleSub">Выбери стиль основного графика.</p>
+        <div class="choice-grid" id="chartChoices">
+          <button class="choice active" data-setting="chart_style" data-value="classic">
+            <div class="choice-title" id="chartStyleClassic">Классическая линия</div>
+            <div class="chart-preview"><canvas data-preview="classic"></canvas></div>
+          </button>
+          <button class="choice" data-setting="chart_style" data-value="smooth">
+            <div class="choice-title" id="chartStyleSmooth">Плавная линия</div>
+            <div class="chart-preview"><canvas data-preview="smooth"></canvas></div>
+          </button>
+          <button class="choice" data-setting="chart_style" data-value="bar">
+            <div class="choice-title" id="chartStyleBar">Столбцы</div>
+            <div class="chart-preview"><canvas data-preview="bar"></canvas></div>
+          </button>
+        </div>
+
+        <div class="option-list">
+          <div class="toggle-row" id="avgLineRow" title="Среднюю линию и линию тренда нельзя включить одновременно.">
+            <div class="toggle-copy">
+              <div class="toggle-title" id="avgLineTitle">Включить среднюю линию</div>
+              <div class="toggle-sub" id="avgLineSub">Показывать усредняющую линию поверх основного графика.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="avgLineToggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row" id="trendLineRow" title="Среднюю линию и линию тренда нельзя включить одновременно.">
+            <div class="toggle-copy">
+              <div class="toggle-title" id="trendLineTitle">Включить линию тренда</div>
+              <div class="toggle-sub" id="trendLineSub">Показывает общее направление графика за выбранный период: рост, снижение или стабильность.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="trendLineToggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row toggle-row-soon" id="autoRefreshRow" title="В разработке">
+            <div class="toggle-copy">
+              <div class="toggle-title" id="autoRefreshTitle">Автообновление</div>
+              <div class="toggle-sub" id="autoRefreshSub">Автообновление последних данных</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="autoRefreshToggle" disabled>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card full">
+        <h2 class="card-title" id="debugTitle">Debug mode</h2>
+        <p class="card-sub" id="debugSub">Открывает диагностический блок с полезными данными для разбора багов и зависаний.</p>
+
+        <div class="debug-toggle">
+          <button class="tiny-btn" id="debugToggleBtn" type="button">Debug mode</button>
+          <span class="card-sub" id="debugToggleSub">Открывает аккордеон со служебными данными приложения и сохранённой статистикой.</span>
+        </div>
+
+        <details class="debug" id="debugDetails">
+          <summary id="debugSummary">Диагностические данные</summary>
+          <div class="debug-body">
+            <div class="debug-log" id="debugLog">Загрузка диагностики...</div>
+            <div class="debug-actions">
+              <button class="tiny-btn" id="refreshDebugBtn" type="button">Обновить диагностику</button>
+              <button class="tiny-btn" id="copyDebugBtn" type="button">Скопировать</button>
+             </div>
+            </div>
+          </details>
+        </section>
+    </div>
+
+    <footer class="popup-footer" aria-label="Информация об авторе">
+      <span class="popup-footer-copy"><span id="footerCopyPrefix">© Кирилл</span> <span class="popup-footer-name">Artnway</span> <span id="footerCopySuffix">Брагин 2026</span></span>
+      <span class="popup-footer-sep">|</span>
+      <a class="popup-footer-link" id="telegramLink" href="https://t.me/Artnwayclub" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram-канал">
+        <span class="popup-footer-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M21.6 4.3 18.4 19c-.2 1-.8 1.2-1.6.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 9-8.1c.4-.4-.1-.6-.6-.3L6.2 12.8 1.5 11.3c-1-.3-1-.9.2-1.4L20.2 3c.9-.3 1.7.2 1.4 1.3Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <span id="telegramLinkText">Telegram</span>
+      </a>
+    </footer>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

@@ -2,12 +2,12 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $distRoot = Join-Path $projectRoot "dist"
-$buildRoot = Join-Path $distRoot "opera"
-$readmeTemplateRoot = Join-Path $projectRoot "readme-templates\\opera"
+$buildRoot = Join-Path $distRoot "chrome"
+$readmeTemplateRoot = Join-Path $projectRoot "readme-templates\\chrome"
 $manifestPath = Join-Path $projectRoot "manifest.json"
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $version = [string]$manifest.version
-$zipFileName = if ($version) { "3dstat-opera-v$version.zip" } else { "3dstat-opera.zip" }
+$zipFileName = if ($version) { "3dstat-chrome-v$version.zip" } else { "3dstat-chrome.zip" }
 $zipPath = Join-Path $distRoot $zipFileName
 
 $filesToCopy = @(
@@ -50,5 +50,5 @@ Set-Content -LiteralPath (Join-Path $buildRoot "README.txt") -Value $readmeTxt -
 
 Compress-Archive -Path (Join-Path $buildRoot "*") -DestinationPath $zipPath -Force
 
-Write-Output "Opera build folder: $buildRoot"
-Write-Output "Opera zip package: $zipPath"
+Write-Output "Chrome build folder: $buildRoot"
+Write-Output "Chrome zip package: $zipPath"

@@ -1,4 +1,6 @@
 /* Date & bucket helpers */
+const extApi = globalThis.browser || globalThis.chrome;
+const IS_FIREFOX = /\bfirefox\//i.test(String(globalThis.navigator?.userAgent || ""));
 const MSK_OFFSET_MS = 3 * 3600 * 1000;
 const FRONTEND_BASE_URLS = [
   "https://3ddd.ru",
@@ -25,7 +27,7 @@ function extractFrontendBaseUrlFromUrl(value) {
 
 async function getPreferredFrontendBaseUrl() {
   try {
-    const stored = await chrome.storage.local.get(["frontendBaseUrl"]);
+    const stored = await extApi.storage.local.get(["frontendBaseUrl"]);
     const normalized = normalizeFrontendBaseUrl(stored?.frontendBaseUrl);
     if (normalized) return normalized;
   } catch {}
@@ -35,7 +37,7 @@ async function getPreferredFrontendBaseUrl() {
 async function setPreferredFrontendBaseUrl(value) {
   const normalized = normalizeFrontendBaseUrl(value);
   if (!normalized) return;
-  await chrome.storage.local.set({ frontendBaseUrl: normalized });
+  await extApi.storage.local.set({ frontendBaseUrl: normalized });
 }
 
 function getFrontendStorageKey(baseUrl) {
@@ -54,7 +56,7 @@ async function getFrontendCandidateBaseUrls(preferredBaseUrl = DEFAULT_FRONTEND_
   push(preferred);
 
   try {
-    const tabs = await chrome.tabs.query({ url: FRONTEND_BASE_URLS.map((base) => `${base}/*`) });
+    const tabs = await extApi.tabs.query({ url: FRONTEND_BASE_URLS.map((base) => `${base}/*`) });
     const seenFromTabs = tabs
       .map((tab) => extractFrontendBaseUrlFromUrl(tab?.url))
       .filter(Boolean);
@@ -67,7 +69,7 @@ async function getFrontendCandidateBaseUrls(preferredBaseUrl = DEFAULT_FRONTEND_
 
 async function getObservedFrontendActivity() {
   try {
-    const stored = await chrome.storage.local.get([
+    const stored = await extApi.storage.local.get([
       "lastObservedFrontend3dddAt",
       "lastObservedFrontend3dskyAt",
       "frontendBaseUrl"
@@ -132,6 +134,48 @@ function bucketHourLabel(dUtc) {
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
+}
+function getChromeRuntimeLastErrorMessage() {
+  return String(globalThis.chrome?.runtime?.lastError?.message || "");
+}
+async function sendRuntimeMessageNoThrow(message) {
+  try {
+    await extApi.runtime.sendMessage(message);
+  } catch {}
+}
+async function getTabById(tabId) {
+  if (typeof extApi.tabs?.get !== "function") {
+    throw new Error("API tabs.get недоступен.");
+  }
+  if ((globalThis.browser && extApi === globalThis.browser) || extApi.tabs.get.length <= 1) {
+    return await extApi.tabs.get(tabId);
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.tabs.get(tabId, (tab) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(tab);
+    });
+  });
+}
+async function executeScriptCompat({ tabId, func }) {
+  if (extApi.scripting?.executeScript) {
+    const options = {
+      target: { tabId },
+      func
+    };
+    if (!IS_FIREFOX) options.world = "MAIN";
+    return await extApi.scripting.executeScript(options);
+  }
+  if (extApi.tabs?.executeScript) {
+    const code = `(${String(func)})();`;
+    const results = await extApi.tabs.executeScript(tabId, { code });
+    return [{ result: Array.isArray(results) ? results[0] : results }];
+  }
+  throw new Error("Не удалось выполнить скрипт на странице: executeScript API недоступен.");
 }
 function elapsedMs(startTs) {
   return Date.now() - startTs;
@@ -567,7 +611,16 @@ const DEBUG_LOGS = [];
 const REQUEST_TRACE_LIMIT = 120;
 const REQUEST_TRACES = [];
 const LOCALIZED_MODEL_TITLE_CACHE = new Map();
+const CACHE_KEYS = {
+  dash: "cachedDashboard",
+  updatedAt: "cachedUpdatedAt",
+  lastError: "cachedLastError",
+  incomeObjects: "cachedIncomeObjects",
+  withdrawStatById: "cachedWithdrawStatById",
+  withdrawStatIndex: "cachedWithdrawStatIndex"
+};
 let refreshState = null;
+let refreshInFlight = null;
 
 function resetApiStats() {
   API_STATS.requests = 0;
@@ -577,9 +630,7 @@ function resetApiStats() {
 function emitRefreshProgress(progress) {
   refreshState = Object.assign({ at: Date.now() }, progress || {});
   try {
-    chrome.runtime.sendMessage({ type: "REFRESH_PROGRESS", progress: refreshState }, () => {
-      void chrome.runtime.lastError;
-    });
+    void sendRuntimeMessageNoThrow({ type: "REFRESH_PROGRESS", progress: refreshState });
   } catch {}
 }
 function clearRefreshProgress() {
@@ -607,7 +658,7 @@ function addRequestTrace(entry) {
 }
 async function getDebugInfo() {
   const cached = await getCachedPack();
-  const tokenInfo = await chrome.storage.local.get(["jwtTokenSource", "jwtTokenObservedAt", "appSettings", "frontendBaseUrl"]);
+  const tokenInfo = await extApi.storage.local.get(["jwtTokenSource", "jwtTokenObservedAt", "appSettings", "frontendBaseUrl"]);
   const frontendSession = await detectActiveFrontendSession();
   return {
     generatedAt: Date.now(),
@@ -711,7 +762,7 @@ async function storeObservedBearerToken(rawValue, source = "unknown") {
   const token = extractBearerToken(rawValue);
   if (!token || isJwtExpired(token, 30)) return false;
 
-  const stored = await chrome.storage.local.get(["jwtToken"]);
+  const stored = await extApi.storage.local.get(["jwtToken"]);
   const current = String(stored?.jwtToken || "").trim();
   if (current === token && !isJwtExpired(current, 30)) return true;
   const payload = {
@@ -724,7 +775,7 @@ async function storeObservedBearerToken(rawValue, source = "unknown") {
     payload[getFrontendStorageKey(frontendBaseUrl)] = Date.now();
   }
 
-  await chrome.storage.local.set(payload);
+  await extApi.storage.local.set(payload);
   if (frontendBaseUrl) {
     await setPreferredFrontendBaseUrl(frontendBaseUrl);
   }
@@ -943,18 +994,18 @@ async function callEndpoint({ endpoint, token, pageSize, pageNumber, extraBody =
 }
 
 async function getStoredToken() {
-  const stored = await chrome.storage.local.get(["jwtToken"]);
+  const stored = await extApi.storage.local.get(["jwtToken"]);
   const token = stored?.jwtToken || null;
   if (!token) return null;
   if (isJwtExpired(token)) {
-    await chrome.storage.local.remove(["jwtToken", "jwtTokenSource", "jwtTokenObservedAt"]);
+    await extApi.storage.local.remove(["jwtToken", "jwtTokenSource", "jwtTokenObservedAt"]);
     return null;
   }
   return token;
 }
 
 async function getStoredWithdrawIds() {
-  const stored = await chrome.storage.local.get(["withdrawIds"]);
+  const stored = await extApi.storage.local.get(["withdrawIds"]);
   const raw = (stored?.withdrawIds || "").trim();
   if (!raw) return [];
   return raw.split(",").map(s => s.trim()).filter(Boolean);
@@ -1002,13 +1053,13 @@ function waitForTabComplete(tabId, timeoutMs = 15000, progress = null) {
 
     chrome.tabs.onUpdated.addListener(onUpdated);
 
-    chrome.tabs.get(tabId, (tt) => {
-      if (chrome.runtime.lastError) {
-        fail(chrome.runtime.lastError.message || "Не удалось получить вкладку.");
-        return;
-      }
-      if (tt?.status === "complete") finish();
-    });
+    void getTabById(tabId)
+      .then((tt) => {
+        if (tt?.status === "complete") finish();
+      })
+      .catch((error) => {
+        fail(error?.message || "Не удалось получить вкладку.");
+      });
 
     timer = setTimeout(() => fail("Таймаут ожидания загрузки страницы 3ddd."), timeoutMs);
   });
@@ -1021,21 +1072,21 @@ async function loadPageHtmlViaTab(url, {
 } = {}) {
   const safeBaseUrl = extractFrontendBaseUrlFromUrl(url) || DEFAULT_FRONTEND_BASE_URL;
   const urlPattern = `${safeBaseUrl}/*`;
-  const tabs = await chrome.tabs.query({ url: [urlPattern] }).catch(() => []);
+  const tabs = await extApi.tabs.query({ url: [urlPattern] }).catch(() => []);
   const preferredTab = tabs.find((tab) => extractFrontendBaseUrlFromUrl(tab?.url) === safeBaseUrl);
   let createdTabId = null;
   let tabId = preferredTab?.id || tabs[0]?.id || null;
 
   try {
     if (!tabId) {
-      const createdTab = await chrome.tabs.create({ url, active: false });
+      const createdTab = await extApi.tabs.create({ url, active: false });
       createdTabId = createdTab?.id || null;
       tabId = createdTab?.id || null;
     } else if (allowReload) {
       try {
-        await chrome.tabs.update(tabId, { url });
+        await extApi.tabs.update(tabId, { url });
       } catch {
-        try { await chrome.tabs.reload(tabId, { bypassCache: true }); } catch {}
+        try { await extApi.tabs.reload(tabId, { bypassCache: true }); } catch {}
       }
     }
 
@@ -1045,15 +1096,14 @@ async function loadPageHtmlViaTab(url, {
 
     await waitForTabComplete(tabId, timeoutMs, progress);
 
-    const executionResult = await chrome.scripting.executeScript({
-      target: { tabId },
-      world: "MAIN",
+    const executionResult = await executeScriptCompat({
+      tabId,
       func: () => document.documentElement?.outerHTML || ""
     });
     return String(executionResult?.[0]?.result || "");
   } finally {
     if (createdTabId) {
-      try { await chrome.tabs.remove(createdTabId); } catch {}
+      try { await extApi.tabs.remove(createdTabId); } catch {}
     }
   }
 }
@@ -1103,7 +1153,7 @@ async function probeFrontendSession(baseUrl) {
 async function detectActiveFrontendSession() {
   const observed = await getObservedFrontendActivity();
   const candidateBaseUrls = await getFrontendCandidateBaseUrls(observed.preferredBaseUrl);
-  const tabs = await chrome.tabs.query({ url: FRONTEND_BASE_URLS.map((base) => `${base}/*`) }).catch(() => []);
+  const tabs = await extApi.tabs.query({ url: FRONTEND_BASE_URLS.map((base) => `${base}/*`) }).catch(() => []);
   const openTabSignals = {
     "https://3ddd.ru": tabs.some((tab) => extractFrontendBaseUrlFromUrl(tab?.url) === "https://3ddd.ru"),
     "https://3dsky.org": tabs.some((tab) => extractFrontendBaseUrlFromUrl(tab?.url) === "https://3dsky.org")
@@ -1118,6 +1168,21 @@ async function detectActiveFrontendSession() {
   let state = "none";
   if (authenticated.length === 1) state = authenticated[0] === "https://3dsky.org" ? "3dsky" : "3ddd";
   else if (authenticated.length > 1) state = "both";
+
+  if (state === "none" && IS_FIREFOX) {
+    const openBases = FRONTEND_BASE_URLS.filter((baseUrl) => openTabSignals[baseUrl]);
+    if (openBases.length === 1) {
+      state = openBases[0] === "https://3dsky.org" ? "3dsky" : "3ddd";
+      addDebugLog("info", "Firefox fallback picked frontend session from open tab", {
+        baseUrl: openBases[0]
+      });
+    } else if (openBases.length > 1) {
+      state = "both";
+      addDebugLog("info", "Firefox fallback picked multiple frontend sessions from open tabs", {
+        baseUrls: openBases
+      });
+    }
+  }
 
   let preferredBaseUrl = null;
   if (state === "3ddd") preferredBaseUrl = "https://3ddd.ru";
@@ -1173,7 +1238,7 @@ async function autoToken() {
 
   for (let domainIndex = 0; domainIndex < candidateBaseUrls.length && !token; domainIndex++) {
     const activeBaseUrl = candidateBaseUrls[domainIndex];
-    const tabs = await chrome.tabs.query({ url: incomePatterns });
+    const tabs = await extApi.tabs.query({ url: incomePatterns });
     let createdTabId = null;
     const matchingTab = tabs.find((tab) => extractFrontendBaseUrlFromUrl(tab?.url) === activeBaseUrl);
     let tabId = matchingTab?.id || null;
@@ -1181,15 +1246,15 @@ async function autoToken() {
     const navigateIncomePage = async (attemptNo) => {
       const url = `${activeBaseUrl}${incomePath}?codex_refresh=${Date.now()}_${attemptNo}`;
       if (!tabId) {
-        const t = await chrome.tabs.create({ url, active: false });
+        const t = await extApi.tabs.create({ url, active: false });
         createdTabId = t.id;
         tabId = t.id;
         return;
       }
       try {
-        await chrome.tabs.update(tabId, { url });
+        await extApi.tabs.update(tabId, { url });
       } catch {
-        await chrome.tabs.reload(tabId, { bypassCache: true });
+        await extApi.tabs.reload(tabId, { bypassCache: true });
       }
     };
 
@@ -1215,9 +1280,8 @@ async function autoToken() {
 
         token = await runWithWatchdog(async () => {
           for (let attempt = 0; attempt < 30; attempt++) {
-            const [{ result }] = await chrome.scripting.executeScript({
-              target: { tabId },
-              world: "MAIN",
+            const [{ result }] = await executeScriptCompat({
+              tabId,
               func: () => {
                 const norm = (v) => String(v || "").replace(/^Bearer\s+/i, "").trim();
                 const decodePayload = (token) => {
@@ -1283,7 +1347,7 @@ async function autoToken() {
                 } catch {}
 
                 try {
-                  const w = window;
+                  const w = window.wrappedJSObject || window;
                   const maybe = [
                     w.__NUXT__?.state?.auth?.token,
                     w.__INITIAL_STATE__?.auth?.token,
@@ -1337,7 +1401,7 @@ async function autoToken() {
     }
 
     if (createdTabId) {
-      try { await chrome.tabs.remove(createdTabId); } catch {}
+      try { await extApi.tabs.remove(createdTabId); } catch {}
     }
 
     if (token) {
@@ -1409,7 +1473,7 @@ async function autoWithdrawIds(token) {
     // 2) Fallback: старый табовый способ (на случай блокировок fetch/cookies)
     console.warn("autoWithdrawIds: fetch-режим не сработал, fallback на tab method:", e);
 
-    const tabs = await chrome.tabs.query({ url: FRONTEND_BASE_URLS.map((base) => `${base}/user/withdraw_history*`) });
+    const tabs = await extApi.tabs.query({ url: FRONTEND_BASE_URLS.map((base) => `${base}/user/withdraw_history*`) });
     let createdTabId = null;
     const preferredTab = tabs.find((tab) => extractFrontendBaseUrlFromUrl(tab?.url) === preferredBaseUrl);
     let activeBaseUrl = preferredTab
@@ -1418,23 +1482,22 @@ async function autoWithdrawIds(token) {
     let tabId = preferredTab?.id || tabs[0]?.id || null;
 
     if (!tabId) {
-      const t = await chrome.tabs.create({ url: `${activeBaseUrl}/user/withdraw_history`, active: false });
+      const t = await extApi.tabs.create({ url: `${activeBaseUrl}/user/withdraw_history`, active: false });
       createdTabId = t.id;
       tabId = t.id;
     } else {
-      try { await chrome.tabs.reload(tabId, { bypassCache: true }); } catch {}
+      try { await extApi.tabs.reload(tabId, { bypassCache: true }); } catch {}
     }
 
     await waitForTabComplete(tabId, 15000);
 
-    const [{ result: html }] = await chrome.scripting.executeScript({
-      target: { tabId },
-      world: "MAIN",
+    const [{ result: html }] = await executeScriptCompat({
+      tabId,
       func: () => document.documentElement?.outerHTML || ""
     });
 
     if (createdTabId) {
-      try { await chrome.tabs.remove(createdTabId); } catch {}
+      try { await extApi.tabs.remove(createdTabId); } catch {}
     }
 
     const text = String(html || "");
@@ -1639,7 +1702,7 @@ async function detectWithdrawIdsIncremental(baseUrl = DEFAULT_FRONTEND_BASE_URL)
   const persistMergedIdsProgress = async () => {
     if (!merged.length) return;
     try {
-      await chrome.storage.local.set({ withdrawIds: Array.from(new Set(merged)).join(", ") });
+      await extApi.storage.local.set({ withdrawIds: Array.from(new Set(merged)).join(", ") });
     } catch {}
   };
 
@@ -1701,7 +1764,7 @@ async function detectWithdrawIdsIncremental(baseUrl = DEFAULT_FRONTEND_BASE_URL)
   const mergedIds = Array.from(new Set(merged));
 
   if (mergedIds.length) {
-    await chrome.storage.local.set({ withdrawIds: mergedIds.join(", ") });
+    await extApi.storage.local.set({ withdrawIds: mergedIds.join(", ") });
   }
 
   return {
@@ -2850,7 +2913,7 @@ async function runDashboard(mode) {
       detail: "Подхватывает новый токен"
     });
     token = await autoToken();
-    await chrome.storage.local.set({ jwtToken: token });
+    await extApi.storage.local.set({ jwtToken: token });
   }
 
   if (!token) throw new Error("Не задан токен. Открой «Токен» и вставь JWT или нажми «Автоподхватить».");
@@ -2865,7 +2928,7 @@ async function runDashboard(mode) {
   } catch (e) {
     if (isAuthTokenError(e) && mode !== "manual") {
       const newToken = await autoToken();
-      await chrome.storage.local.set({ jwtToken: newToken });
+      await extApi.storage.local.set({ jwtToken: newToken });
       return await loadDashboard(newToken);
     }
     throw e;
@@ -2877,7 +2940,7 @@ async function ensureStoredJwtToken() {
   let token = await getStoredToken();
   if (token) return token;
   token = await autoToken();
-  await chrome.storage.local.set({ jwtToken: token });
+  await extApi.storage.local.set({ jwtToken: token });
   return token;
 }
 
@@ -2959,11 +3022,11 @@ function handleRuntimeMessage(msg, sendResponse) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => handleRuntimeMessage(msg, sendResponse));
+extApi.runtime.onMessage.addListener((msg, _sender, sendResponse) => handleRuntimeMessage(msg, sendResponse));
 
 /* Passive token observation */
-if (chrome.webRequest?.onBeforeSendHeaders) {
-  chrome.webRequest.onBeforeSendHeaders.addListener(
+if (extApi.webRequest?.onBeforeSendHeaders) {
+  extApi.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
       try {
         const headers = details?.requestHeaders || [];
@@ -2985,15 +3048,6 @@ if (chrome.webRequest?.onBeforeSendHeaders) {
 }
 
 /* Cache & refresh orchestration */
-const CACHE_KEYS = {
-  dash: "cachedDashboard",
-  updatedAt: "cachedUpdatedAt",
-  lastError: "cachedLastError",
-  incomeObjects: "cachedIncomeObjects",
-  withdrawStatById: "cachedWithdrawStatById",
-  withdrawStatIndex: "cachedWithdrawStatIndex"
-};
-
 const APP_DB = {
   name: "3dstat-db",
   version: 1,
@@ -3003,7 +3057,6 @@ const APP_DB = {
   }
 };
 
-let refreshInFlight = null;
 let appDbPromise = null;
 let withdrawCacheMigrationPromise = null;
 
@@ -3109,7 +3162,7 @@ async function idbSetMetaValue(key, value) {
 }
 
 async function setWithdrawCacheStorageSignal(extra = {}) {
-  await chrome.storage.local.set({
+  await extApi.storage.local.set({
     [CACHE_KEYS.withdrawStatIndex]: Object.assign({
       version: 3,
       backend: "idb",
@@ -3119,14 +3172,14 @@ async function setWithdrawCacheStorageSignal(extra = {}) {
 }
 
 async function resolveWithdrawStatStorageCache() {
-  const stored = await chrome.storage.local.get([CACHE_KEYS.withdrawStatIndex, CACHE_KEYS.withdrawStatById]);
+  const stored = await extApi.storage.local.get([CACHE_KEYS.withdrawStatIndex, CACHE_KEYS.withdrawStatById]);
   const index = stored?.[CACHE_KEYS.withdrawStatIndex];
   if (index?.version === 2 && Array.isArray(index?.wids) && index.wids.length) {
     const entryKeys = index.wids
       .map((wid) => String(wid || "").trim())
       .filter(Boolean)
       .map(getWithdrawStatEntryKey);
-    const entries = entryKeys.length ? await chrome.storage.local.get(entryKeys) : {};
+    const entries = entryKeys.length ? await extApi.storage.local.get(entryKeys) : {};
     const out = {};
     for (const wid of index.wids) {
       const safeWid = String(wid || "").trim();
@@ -3157,7 +3210,7 @@ async function cleanupWithdrawStatStorageCache(storedIndex = null) {
     }
   }
   keysToRemove.push(CACHE_KEYS.withdrawStatIndex);
-  await chrome.storage.local.remove(Array.from(new Set(keysToRemove)));
+  await extApi.storage.local.remove(Array.from(new Set(keysToRemove)));
 }
 
 async function ensureWithdrawCacheMigratedToIndexedDb() {
@@ -3189,7 +3242,7 @@ async function ensureWithdrawCacheMigratedToIndexedDb() {
 
 /* Cache storage helpers */
 async function getCachedPack() {
-  const v = await chrome.storage.local.get([CACHE_KEYS.dash, CACHE_KEYS.updatedAt, CACHE_KEYS.lastError]);
+  const v = await extApi.storage.local.get([CACHE_KEYS.dash, CACHE_KEYS.updatedAt, CACHE_KEYS.lastError]);
   return {
     dashboard: v?.[CACHE_KEYS.dash] || null,
     updatedAt: v?.[CACHE_KEYS.updatedAt] || null,
@@ -3202,7 +3255,7 @@ async function setCachedPack({ dashboard, updatedAt, lastError }) {
   if (dashboard !== undefined) obj[CACHE_KEYS.dash] = dashboard;
   if (updatedAt !== undefined) obj[CACHE_KEYS.updatedAt] = updatedAt;
   if (lastError !== undefined) obj[CACHE_KEYS.lastError] = lastError;
-  await chrome.storage.local.set(obj);
+  await extApi.storage.local.set(obj);
 }
 
 async function getWithdrawStatCache() {
@@ -3245,18 +3298,18 @@ async function writeWithdrawStatCacheV2(cacheMap) {
       objects: compactSalesArray(entry?.objects)
     };
   }
-  await chrome.storage.local.set(payload);
+  await extApi.storage.local.set(payload);
   return normalizedCache;
 }
 
 async function getIncomeCache() {
-  const v = await chrome.storage.local.get([CACHE_KEYS.incomeObjects]);
+  const v = await extApi.storage.local.get([CACHE_KEYS.incomeObjects]);
   const raw = v?.[CACHE_KEYS.incomeObjects];
   return Array.isArray(raw) ? raw : [];
 }
 
 async function setIncomeCache(objects) {
-  await chrome.storage.local.set({
+  await extApi.storage.local.set({
     [CACHE_KEYS.incomeObjects]: Array.isArray(objects) ? objects : []
   });
 }
@@ -3289,7 +3342,7 @@ async function setWithdrawStatCacheEntries(entries) {
     });
   }
 
-  const stored = await chrome.storage.local.get([CACHE_KEYS.withdrawStatIndex, CACHE_KEYS.withdrawStatById]);
+  const stored = await extApi.storage.local.get([CACHE_KEYS.withdrawStatIndex, CACHE_KEYS.withdrawStatById]);
   const hasV2Index = stored?.[CACHE_KEYS.withdrawStatIndex]?.version === 2;
   const legacyCache = stored?.[CACHE_KEYS.withdrawStatById] && typeof stored[CACHE_KEYS.withdrawStatById] === "object"
     ? compactWithdrawCacheMap(stored[CACHE_KEYS.withdrawStatById])
@@ -3299,7 +3352,7 @@ async function setWithdrawStatCacheEntries(entries) {
   const needsFullMigration = !hasV2Index && Object.keys(legacyCache).length > 0;
   if (needsFullMigration) {
     await writeWithdrawStatCacheV2(merged);
-    await chrome.storage.local.remove([CACHE_KEYS.withdrawStatById]);
+    await extApi.storage.local.remove([CACHE_KEYS.withdrawStatById]);
     return;
   }
 
@@ -3317,9 +3370,9 @@ async function setWithdrawStatCacheEntries(entries) {
       objects: compactSalesArray(entry?.objects)
     };
   }
-  await chrome.storage.local.set(payload);
+  await extApi.storage.local.set(payload);
   if (stored?.[CACHE_KEYS.withdrawStatById]) {
-    await chrome.storage.local.remove([CACHE_KEYS.withdrawStatById]);
+    await extApi.storage.local.remove([CACHE_KEYS.withdrawStatById]);
   }
 }
 

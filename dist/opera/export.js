@@ -1,3 +1,4 @@
+const extApi = globalThis.browser || globalThis.chrome;
 const APP_SETTINGS_KEY = "appSettings";
 const EXPORT_SETTINGS_KEY = "exportSettings";
 const UI_LANGUAGE_KEY = "uiLanguage";
@@ -23,6 +24,63 @@ let previewState = null;
 let currentLanguage = "ru";
 let currentFrontendBaseUrl = "https://3ddd.ru";
 let currentLanguageMode = "auto";
+
+function isPromiseLike(value) {
+  return !!value && typeof value.then === "function";
+}
+
+function getChromeRuntimeLastErrorMessage() {
+  return String(globalThis.chrome?.runtime?.lastError?.message || "");
+}
+
+async function storageGet(keys) {
+  if ((globalThis.browser && extApi === globalThis.browser) || extApi.storage?.local?.get?.length <= 1) {
+    return await extApi.storage.local.get(keys);
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.storage.local.get(keys, (result) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(result || {});
+    });
+  });
+}
+
+async function storageSet(payload) {
+  if ((globalThis.browser && extApi === globalThis.browser) || extApi.storage?.local?.set?.length <= 1) {
+    return await extApi.storage.local.set(payload);
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.storage.local.set(payload, () => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function sendRuntimeMessage(message) {
+  const result = extApi.runtime.sendMessage(message);
+  if (isPromiseLike(result)) {
+    return await result;
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.runtime.sendMessage(message, (response) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
 
 const I18N = {
   ru: {
@@ -258,7 +316,7 @@ function setHtml(id, value) {
 
 async function loadFrontendLanguage() {
   try {
-    const stored = await chrome.storage.local.get(["frontendBaseUrl", UI_LANGUAGE_KEY]);
+    const stored = await storageGet(["frontendBaseUrl", UI_LANGUAGE_KEY]);
     currentFrontendBaseUrl = normalizeFrontendBaseUrl(stored?.frontendBaseUrl || "");
     currentLanguageMode = ["auto", "ru", "en"].includes(stored?.[UI_LANGUAGE_KEY]) ? stored[UI_LANGUAGE_KEY] : "auto";
     currentLanguage = resolveLanguage(currentFrontendBaseUrl, currentLanguageMode);
@@ -574,7 +632,7 @@ function loadStateFromStorage(stored) {
 
 async function persistExportSettings() {
   currentExportSettings = sanitizeExportSettings(currentExportSettings);
-  await chrome.storage.local.set({ [EXPORT_SETTINGS_KEY]: currentExportSettings });
+  await storageSet({ [EXPORT_SETTINGS_KEY]: currentExportSettings });
   flashSaved();
 }
 
@@ -1113,19 +1171,19 @@ function bindCustomRange() {
 }
 
 async function loadInitialState() {
-  const stored = await chrome.storage.local.get([
+  const stored = await storageGet([
     APP_SETTINGS_KEY,
     EXPORT_SETTINGS_KEY,
     "cachedDashboard"
   ]);
-  const salesResp = await chrome.runtime.sendMessage({ type: "GET_CACHED_SALES_OBJECTS" });
+  const salesResp = await sendRuntimeMessage({ type: "GET_CACHED_SALES_OBJECTS" });
   stored.__salesPayload = salesResp?.ok ? (salesResp.data || {}) : {};
   loadStateFromStorage(stored);
 }
 
 function bindActions() {
   $("#openSettingsBtn")?.addEventListener("click", () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
+    extApi.tabs.create({ url: extApi.runtime.getURL("settings.html") });
   });
 
   $("#downloadExportBtn")?.addEventListener("click", () => {
@@ -1154,12 +1212,12 @@ function bindActions() {
     updateCheckboxUi();
     renderPreview();
     flashSaved(tr("languageChanged", { mode: tr(`languageMode${nextMode[0].toUpperCase()}${nextMode.slice(1)}`) }));
-    await chrome.storage.local.set({ [UI_LANGUAGE_KEY]: nextMode });
+    await storageSet({ [UI_LANGUAGE_KEY]: nextMode });
   });
 }
 
 function bindStorageSync() {
-  chrome.storage.onChanged?.addListener((changes, area) => {
+  extApi.storage.onChanged?.addListener((changes, area) => {
     if (area !== "local") return;
     const hasWithdrawCacheChange = Object.keys(changes || {}).some((key) =>
       key === WITHDRAW_CACHE_INDEX_KEY ||
@@ -1181,7 +1239,7 @@ function bindStorageSync() {
       renderPreview();
     }
     if (changes?.cachedIncomeObjects || hasWithdrawCacheChange) {
-      void chrome.runtime.sendMessage({ type: "GET_CACHED_SALES_OBJECTS" }).then((resp) => {
+      void sendRuntimeMessage({ type: "GET_CACHED_SALES_OBJECTS" }).then((resp) => {
         cachedObjects = loadCachedSalesObjectsFromPayload(resp?.ok ? (resp.data || {}) : {}).combined || [];
         renderPreview();
       });

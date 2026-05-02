@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3DStat — Экспорт</title>
+  <link rel="stylesheet" href="themes.css" />
+  <link rel="stylesheet" href="export.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="hero">
+      <div>
+        <h1 class="hero-title hero-title-with-icon"><img class="hero-title-icon" src="icons/Icon.png" alt="" /><span id="exportHeroTitle">Экспорт в Excel</span> <span class="hero-badge">Beta</span></h1>
+        <p class="hero-sub" id="exportHeroSub">Собери удобную выгрузку по продажам: выбери период, листы Excel и поля таблицы. <br>Экспорт строится по тем же сохранённым данным, что и основная статистика приложения.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="action-btn lang-toggle" id="langBtn" type="button" aria-label="Переключить язык">AUTO</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card full">
+        <h2 class="card-title" id="periodTitle">Период</h2>
+        <p class="card-sub" id="periodSub">Периоды считаются по той же логике, что и статистика в приложении. Для пользовательского диапазона можно выбрать свои даты.</p>
+        <div class="choice-grid export-period-grid" id="periodChoices">
+          <button class="choice choice-compact" type="button" data-setting="period" data-value="today" id="periodToday">Сегодня</button>
+          <button class="choice choice-compact" type="button" data-setting="period" data-value="7d" id="period7d">7 дней</button>
+          <button class="choice choice-compact" type="button" data-setting="period" data-value="30d" id="period30d">30 дней</button>
+          <button class="choice choice-compact" type="button" data-setting="period" data-value="ytd" id="periodYtd">С начала года</button>
+          <button class="choice choice-compact" type="button" data-setting="period" data-value="all" id="periodAll">Всё время</button>
+          <button class="choice choice-compact" type="button" data-setting="period" data-value="custom" id="periodCustom">Свой диапазон</button>
+        </div>
+        <div class="custom-range" id="customRange">
+          <label class="field">
+            <span class="field-label" id="customFromLabel">От</span>
+            <input id="customFrom" class="field-input" type="date" />
+          </label>
+          <label class="field">
+            <span class="field-label" id="customToLabel">До</span>
+            <input id="customTo" class="field-input" type="date" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title" id="sheetsTitle">Листы Excel</h2>
+        <p class="card-sub" id="sheetsSub">Можно отключить лишние листы и оставить только те, что реально нужны.</p>
+        <div class="stack" id="sheetChoices">
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-sheet="summary" checked /> <span id="sheetSummaryLabel">Сводка</span></label>
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-sheet="sales" checked /> <span id="sheetSalesLabel">Продажи</span></label>
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-sheet="daily" checked /> <span id="sheetDailyLabel">Дни</span></label>
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-sheet="monthly" checked /> <span id="sheetMonthlyLabel">Месяцы</span></label>
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-sheet="top" checked /> <span id="sheetTopLabel">Топ модели</span></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title" id="fieldsTitle">Поля таблицы «Продажи»</h2>
+        <p class="card-sub" id="fieldsSub">Настрой, какие колонки попадут в основной лист с продажами.</p>
+        <div class="stack" id="fieldChoices">
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-field="date" checked /> <span id="fieldDateLabel">Дата и время продажи</span></label>
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-field="model" checked /> <span id="fieldModelLabel">Название модели</span></label>
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-field="site" checked /> <span id="fieldSiteLabel">Сайт продажи</span></label>
+          <label class="toggle-row checkbox-row"><input type="checkbox" data-field="amount" checked /> <span id="fieldAmountLabel">Сумма авторских</span></label>
+        </div>
+      </section>
+
+      <section class="card full">
+        <h2 class="card-title" id="previewTitle">Превью экспорта</h2>
+        <p class="card-sub" id="previewSub">Перед выгрузкой можно увидеть, что именно войдёт в файл.</p>
+        <div class="preview-grid" id="previewSummary"></div>
+        <div class="preview-panel">
+          <div class="preview-list" id="previewSheets"></div>
+          <div class="preview-list" id="previewTop"></div>
+        </div>
+      </section>
+
+      <section class="card full actions-card">
+        <div class="actions-row">
+          <div class="actions-copy">
+            <h2 class="card-title" id="readyTitle">Готово к экспорту</h2>
+            <p class="card-sub" id="readySub">Файл будет сохранён в формате <code>.xls</code> и откроется в Excel или совместимых таблицах.</p>
+          </div>
+          <div class="actions-buttons">
+            <button class="action-btn" id="openSettingsBtn" type="button">Настройки</button>
+            <button class="btn primary" id="downloadExportBtn" type="button">Скачать .xls</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="popup-footer" aria-label="Информация об авторе">
+      <span class="popup-footer-copy"><span id="footerCopyPrefix">© Кирилл</span> <span class="popup-footer-name">Artnway</span> <span id="footerCopySuffix">Брагин 2026</span></span>
+      <span class="popup-footer-sep">|</span>
+      <a class="popup-footer-link" id="telegramLink" href="https://t.me/Artnwayclub" target="_blank" rel="noopener noreferrer" aria-label="Открыть Telegram-канал">
+        <span class="popup-footer-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M21.6 4.3 18.4 19c-.2 1-.8 1.2-1.6.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 9-8.1c.4-.4-.1-.6-.6-.3L6.2 12.8 1.5 11.3c-1-.3-1-.9.2-1.4L20.2 3c.9-.3 1.7.2 1.4 1.3Z" fill="currentColor"/>
+          </svg>
+        </span>
+        <span id="telegramLinkText">Telegram</span>
+      </a>
+    </footer>
+  </div>
+
+  <script src="export.js"></script>
+</body>
+</html>

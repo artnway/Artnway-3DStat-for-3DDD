@@ -1,7 +1,9 @@
 /* DOM & popup constants */
 const $ = (q) => document.querySelector(q);
+const extApi = globalThis.browser || globalThis.chrome;
 const APP_SETTINGS_KEY = "appSettings";
 const POPUP_UI_STATE_KEY = "popupUiState";
+const SETUP_STARTED_KEY = "setupStarted";
 const UI_LANGUAGE_KEY = "uiLanguage";
 const WITHDRAW_CACHE_INDEX_KEY = "cachedWithdrawStatIndex";
 const WITHDRAW_CACHE_LEGACY_KEY = "cachedWithdrawStatById";
@@ -71,8 +73,84 @@ let cachedSalesObjects = [];
 let currentLanguage = "ru";
 let currentFrontendBaseUrl = "https://3ddd.ru";
 let currentLanguageMode = "auto";
+let setupStarted = false;
 const localizedModelTitleCache = new Map();
 const pendingModelTitleRequests = new Map();
+
+function isPromiseLike(value) {
+  return !!value && typeof value.then === "function";
+}
+
+function getChromeRuntimeLastErrorMessage() {
+  return String(globalThis.chrome?.runtime?.lastError?.message || "");
+}
+
+async function storageGet(keys) {
+  if ((globalThis.browser && extApi === globalThis.browser) || extApi.storage?.local?.get?.length <= 1) {
+    return await extApi.storage.local.get(keys);
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.storage.local.get(keys, (result) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(result || {});
+    });
+  });
+}
+
+async function storageSet(payload) {
+  if ((globalThis.browser && extApi === globalThis.browser) || extApi.storage?.local?.set?.length <= 1) {
+    return await extApi.storage.local.set(payload);
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.storage.local.set(payload, () => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function sendRuntimeMessage(message) {
+  const result = extApi.runtime.sendMessage(message);
+  if (isPromiseLike(result)) {
+    return await result;
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.runtime.sendMessage(message, (response) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+async function getCurrentTabCompat() {
+  if (typeof extApi.tabs?.getCurrent !== "function") return null;
+  const result = extApi.tabs.getCurrent();
+  if (isPromiseLike(result)) {
+    return await result;
+  }
+  return await new Promise((resolve, reject) => {
+    extApi.tabs.getCurrent((tab) => {
+      const errorMessage = getChromeRuntimeLastErrorMessage();
+      if (errorMessage) {
+        reject(new Error(errorMessage));
+        return;
+      }
+      resolve(tab || null);
+    });
+  });
+}
 
 const I18N = {
   ru: {
@@ -312,8 +390,9 @@ function sanitizeViewport(viewport) {
 
 async function loadPopupUiState() {
   try {
-    const stored = await chrome.storage.local.get([POPUP_UI_STATE_KEY]);
+    const stored = await storageGet([POPUP_UI_STATE_KEY, SETUP_STARTED_KEY]);
     const state = stored?.[POPUP_UI_STATE_KEY] || {};
+    setupStarted = stored?.[SETUP_STARTED_KEY] === true || state?.setupStarted === true;
     if (["24h", "7d", "30d", "all"].includes(state.chartScale)) {
       currentChartScale = state.chartScale;
     }
@@ -324,15 +403,24 @@ async function loadPopupUiState() {
   } catch {}
 }
 
-function persistPopupUiState() {
-  chrome.storage.local.set({
+async function persistPopupUiState() {
+  await storageSet({
+    [SETUP_STARTED_KEY]: setupStarted,
     [POPUP_UI_STATE_KEY]: {
+      setupStarted,
       chartScale: currentChartScale,
       chartViewportByScale: {
         all: sanitizeViewport(chartViewportByScale.all || { start: 0, size: 1 })
       }
     }
-  }).catch?.(() => {});
+  });
+}
+
+async function markSetupStarted(value = true) {
+  setupStarted = value === true;
+  try {
+    await persistPopupUiState();
+  } catch {}
 }
 
 function themeColor(name, fallback = "") {
@@ -426,7 +514,7 @@ function translateProgressText(text, progress = null) {
 
 async function loadFrontendLanguage() {
   try {
-    const stored = await chrome.storage.local.get(["frontendBaseUrl", UI_LANGUAGE_KEY]);
+    const stored = await storageGet(["frontendBaseUrl", UI_LANGUAGE_KEY]);
     currentFrontendBaseUrl = normalizeFrontendBaseUrl(stored?.frontendBaseUrl || "");
     currentLanguageMode = ["auto", "ru", "en"].includes(stored?.[UI_LANGUAGE_KEY]) ? stored[UI_LANGUAGE_KEY] : "auto";
     currentLanguage = resolveLanguage(currentFrontendBaseUrl, currentLanguageMode);
@@ -565,7 +653,7 @@ function sanitizeAppSettings(raw = {}) {
 
 async function loadAppSettings() {
   try {
-    const stored = await chrome.storage.local.get([APP_SETTINGS_KEY]);
+    const stored = await storageGet([APP_SETTINGS_KEY]);
     return sanitizeAppSettings(stored?.[APP_SETTINGS_KEY] || {});
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -792,7 +880,7 @@ function scheduleLocalizedModelTitleFetch(item) {
   const slug = String(item?.slug || "").trim();
   if (!slug || localizedModelTitleCache.has(slug) || pendingModelTitleRequests.has(slug)) return;
 
-  const request = chrome.runtime.sendMessage({
+  const request = sendRuntimeMessage({
     type: "GET_LOCALIZED_MODEL_TITLE",
     slug,
     language: "en"
@@ -1064,7 +1152,7 @@ function setChartSummary(container, count, sum) {
 
 async function loadCachedSalesObjects() {
   try {
-    const resp = await chrome.runtime.sendMessage({ type: "GET_CACHED_SALES_OBJECTS" });
+    const resp = await sendRuntimeMessage({ type: "GET_CACHED_SALES_OBJECTS" });
     cachedSalesObjects = Array.isArray(resp?.data?.combinedObjects) ? resp.data.combinedObjects : [];
   } catch {
     cachedSalesObjects = [];
@@ -2297,7 +2385,7 @@ function renderAll(data, updatedAt = null) {
 }
 
 async function loadCached() {
-  const resp = await chrome.runtime.sendMessage({ type: "GET_CACHED" });
+  const resp = await sendRuntimeMessage({ type: "GET_CACHED" });
   if (!resp?.ok) return null;
   return resp;
 }
@@ -2320,12 +2408,12 @@ async function syncCachedDashboard({ preserveProgress = false } = {}) {
 }
 
 async function loadRefreshState() {
-  const resp = await chrome.runtime.sendMessage({ type: "GET_REFRESH_STATE" });
+  const resp = await sendRuntimeMessage({ type: "GET_REFRESH_STATE" });
   return resp?.ok ? resp.progress : null;
 }
 
 async function refreshNow(loadMode = "auto") {
-  const resp = await chrome.runtime.sendMessage({ type: "REFRESH_NOW", mode: loadMode });
+  const resp = await sendRuntimeMessage({ type: "REFRESH_NOW", mode: loadMode });
   if (!resp?.ok) throw new Error(resp?.error || tr("refreshFailed"));
   return resp;
 }
@@ -2592,6 +2680,10 @@ function wireTabs() {
 function handleRefreshProgressMessage(msg) {
   if (msg?.type !== "REFRESH_PROGRESS") return;
   const progress = msg.progress || null;
+  if (progress) {
+    setupStarted = true;
+    void persistPopupUiState();
+  }
   showDashboard();
   setProgressState(progress);
   if (progress?.phase === "done" || progress?.phase === "error") {
@@ -2626,6 +2718,10 @@ function handleStorageChanges(changes, area) {
     });
   }
   if (changes?.cachedDashboard || changes?.cachedUpdatedAt || changes?.cachedLastError) {
+    if (changes?.cachedDashboard?.newValue) {
+      setupStarted = true;
+      void persistPopupUiState();
+    }
     void loadCachedSalesObjects()
       .then(() => syncCachedDashboard({ preserveProgress: true }))
       .catch(() => {});
@@ -2633,13 +2729,13 @@ function handleStorageChanges(changes, area) {
 }
 
 function wireRuntimeListeners() {
-  chrome.runtime.onMessage.addListener(handleRefreshProgressMessage);
-  chrome.storage.onChanged?.addListener(handleStorageChanges);
+  extApi.runtime.onMessage.addListener(handleRefreshProgressMessage);
+  extApi.storage.onChanged?.addListener(handleStorageChanges);
 }
 
 async function applyPopupDisplayMode() {
   try {
-    const currentTab = await chrome.tabs.getCurrent();
+    const currentTab = await getCurrentTabCompat();
     if (currentTab?.id) {
       document.body.classList.add("page-mode");
     } else {
@@ -2669,9 +2765,10 @@ function wireActions() {
   $("#startSetup").addEventListener("click", async () => {
     try {
       $("#startSetup").disabled = true;
+      await markSetupStarted(true);
       await startRefresh("auto");
     } catch (e) {
-      showOnboarding();
+      showDashboard();
       document.getElementById("welcomeHint").textContent = translateProgressText(e?.message || String(e));
       showStatus(e?.message || String(e), true);
     } finally {
@@ -2680,19 +2777,19 @@ function wireActions() {
   });
 
   $("#settingsBtn")?.addEventListener("click", () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
+    extApi.tabs.create({ url: extApi.runtime.getURL("settings.html") });
   });
 
   $("#exportBtn")?.addEventListener("click", () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("export.html") });
+    extApi.tabs.create({ url: extApi.runtime.getURL("export.html") });
   });
 
   $("#openTabBtn")?.addEventListener("click", () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("popup.html") });
+    extApi.tabs.create({ url: extApi.runtime.getURL("popup.html") });
   });
 
   $("#telegramLink")?.addEventListener("click", () => {
-    chrome.tabs.create({ url: "https://t.me/Artnwayclub" });
+    extApi.tabs.create({ url: "https://t.me/Artnwayclub" });
   });
 
   $("#langBtn")?.addEventListener("click", async () => {
@@ -2703,7 +2800,7 @@ function wireActions() {
     applyPopupLocale();
     rerenderCurrentDashboard();
     showStatus(tr("languageChanged", { mode: tr(`languageMode${nextMode[0].toUpperCase()}${nextMode.slice(1)}`) }), true);
-    await chrome.storage.local.set({ [UI_LANGUAGE_KEY]: nextMode });
+    await storageSet({ [UI_LANGUAGE_KEY]: nextMode });
   });
 
 }
@@ -2725,6 +2822,8 @@ async function init() {
 
     const progress = await loadRefreshState();
     if (progress) {
+      setupStarted = true;
+      await persistPopupUiState();
       showDashboard();
       finishBootstrap();
       setProgressState(progress);
@@ -2733,6 +2832,14 @@ async function init() {
     }
 
     if (await syncCachedDashboard()) {
+      setupStarted = true;
+      await persistPopupUiState();
+      finishBootstrap();
+      return;
+    }
+
+    if (setupStarted) {
+      showDashboard();
       finishBootstrap();
       return;
     }
@@ -2740,7 +2847,11 @@ async function init() {
     showOnboarding();
     finishBootstrap();
   } catch (e) {
-    showOnboarding();
+    if (setupStarted) {
+      showDashboard();
+    } else {
+      showOnboarding();
+    }
     showStatus(e?.message || String(e), true);
     finishBootstrap();
   }
