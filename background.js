@@ -439,6 +439,25 @@ function stripHtmlTags(value) {
     .trim();
 }
 
+function decodeHtmlEntitiesBasic(value) {
+  return String(value || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const num = Number(code);
+      return Number.isFinite(num) ? String.fromCodePoint(num) : _;
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const num = Number.parseInt(code, 16);
+      return Number.isFinite(num) ? String.fromCodePoint(num) : _;
+    })
+    .trim();
+}
+
 function parseUploadedModelsCountFromHtml(html) {
   const text = String(html || "");
   const blockMatch = text.match(/<div[^>]*class=["'][^"']*\byou_bought\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
@@ -460,6 +479,41 @@ function parseUploadedModelsCountFromHtml(html) {
   const fallbackValue = Number(String(blockText || "").replace(/[^\d]/g, ""));
   if (Number.isFinite(fallbackValue) && fallbackValue >= 0) return fallbackValue;
   return null;
+}
+
+function parseAuthorProfileFromHtml(html, baseUrl = DEFAULT_FRONTEND_BASE_URL) {
+  const text = String(html || "");
+  const nameHtml =
+    text.match(/<span[^>]*class=["'][^"']*\busername\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i)?.[1]
+    || text.match(/id=["']private_data_block["'][\s\S]*?<div[^>]*class=["'][^"']*\bname\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]
+    || "";
+
+  const balanceHtml =
+    text.match(/<div[^>]*class=["'][^"']*\baccount-block\b[^"']*["'][^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>\s*<\/div>/i)?.[1]
+    || text.match(/<div[^>]*class=["'][^"']*\bstat\b[^"']*["'][\s\S]*?<a[^>]+href=["'][^"']*\/user\/income_new[^"']*["'][^>]*>([\s\S]*?)<\/a>/i)?.[1]
+    || "";
+
+  let avatar =
+    text.match(/<div[^>]*class=["'][^"']*\bperson\b[^"']*["'][^>]*>\s*<img[^>]+(?:src|data-src)=["']([^"']+)["'][^>]*class=["'][^"']*\bavatar\b/i)?.[1]
+    || text.match(/<img[^>]+(?:src|data-src)=["']([^"']+)["'][^>]*class=["'][^"']*\bavatar\b[^"']*\bround-avatar\b/i)?.[1]
+    || text.match(/<div[^>]*class=["'][^"']*\bperson\b[^"']*["'][\s\S]*?background-image\s*:\s*url\((['"]?)([^)'"]+)\1\)/i)?.[2]
+    || "";
+
+  const profile = {
+    name: decodeHtmlEntitiesBasic(stripHtmlTags(nameHtml || "")),
+    balance: decodeHtmlEntitiesBasic(stripHtmlTags(balanceHtml || "")),
+    avatar: ""
+  };
+
+  if (avatar) {
+    try {
+      profile.avatar = new URL(avatar, `${normalizeFrontendBaseUrl(baseUrl) || DEFAULT_FRONTEND_BASE_URL}/`).href;
+    } catch {
+      profile.avatar = avatar;
+    }
+  }
+
+  return profile;
 }
 
 function normalizeParsedModelTitle(value) {
@@ -1663,6 +1717,51 @@ async function fetchUploadedModelsCount(baseUrl = DEFAULT_FRONTEND_BASE_URL) {
 
   return null;
 }
+
+async function fetchAuthorProfile(baseUrl = DEFAULT_FRONTEND_BASE_URL) {
+  const safeBaseUrl = normalizeFrontendBaseUrl(baseUrl) || DEFAULT_FRONTEND_BASE_URL;
+  const url = `${safeBaseUrl}/user/`;
+  const REQUEST_TIMEOUT_MS = 20000;
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(`timeout:user_profile:${attempt + 1}`), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
+          await sleep(1200 + attempt * 1000);
+          continue;
+        }
+        throw new Error(`HTTP ${response.status} при загрузке ${url}`);
+      }
+      const html = await response.text();
+      const profile = parseAuthorProfileFromHtml(html, safeBaseUrl);
+      if (profile.name || profile.balance || profile.avatar) return profile;
+      throw new Error("Не удалось извлечь профиль автора со страницы /user/");
+    } catch (error) {
+      const isRetryable =
+        error?.name === "AbortError" ||
+        isNetworkFetchError(error) ||
+        /HTTP (429|5\d\d)\b/.test(String(error?.message || ""));
+      if (isRetryable && attempt < MAX_RETRIES) {
+        await sleep(1200 + attempt * 1000);
+        continue;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return null;
+}
 function extractWithdrawIdsFromHtml(html) {
   const out = [];
   const re = /href="\/user\/withdraw_stat\/([A-Z0-9]+)"/g;
@@ -2253,6 +2352,16 @@ async function fetchAllData(token) {
     });
   }
 
+  let authorProfile = null;
+  try {
+    authorProfile = await fetchAuthorProfile(preferredFrontendBaseUrl);
+  } catch (error) {
+    addDebugLog("warn", "user profile fetch failed", {
+      frontendBaseUrl: preferredFrontendBaseUrl,
+      message: error?.message || String(error)
+    });
+  }
+
   return {
     objects: [...taggedIncome, ...taggedWithdraw],
     pagesFetched: { income: income.pagesFetched, withdraw_stat: withdraw.pagesFetched },
@@ -2279,7 +2388,8 @@ async function fetchAllData(token) {
     },
     dataSources,
     newSalesCount: income.cacheStats?.newCount || 0,
-    uploadedModelsTotal
+    uploadedModelsTotal,
+    authorProfile
   };
 }
 
@@ -2866,7 +2976,8 @@ function finalizeDashboardRun(allData, runStartedAt) {
     uploadedModelsTotal: Number.isFinite(uploadedModelsTotal) && uploadedModelsTotal >= 0 ? uploadedModelsTotal : null,
     validation,
     topBlockAudit,
-    newSalesCount: allData.newSalesCount || 0
+    newSalesCount: allData.newSalesCount || 0,
+    authorProfile: allData.authorProfile || null
   };
   if (!validation.ok) {
     addDebugLog("warn", "Dashboard validation warnings", {

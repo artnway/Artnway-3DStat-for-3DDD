@@ -76,6 +76,7 @@ let currentLanguageMode = "auto";
 let setupStarted = false;
 const localizedModelTitleCache = new Map();
 const pendingModelTitleRequests = new Map();
+const isDashboardPage = /dashboard\.html$/i.test(globalThis.location?.pathname || "");
 
 function isPromiseLike(value) {
   return !!value && typeof value.then === "function";
@@ -83,6 +84,25 @@ function isPromiseLike(value) {
 
 function getChromeRuntimeLastErrorMessage() {
   return String(globalThis.chrome?.runtime?.lastError?.message || "");
+}
+
+function decodeHtmlEntitiesBasic(value) {
+  return String(value || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const num = Number(code);
+      return Number.isFinite(num) ? String.fromCodePoint(num) : _;
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const num = Number.parseInt(code, 16);
+      return Number.isFinite(num) ? String.fromCodePoint(num) : _;
+    })
+    .trim();
 }
 
 async function storageGet(keys) {
@@ -546,7 +566,9 @@ function applyPopupLocale() {
   setText("welcomeHint", tr("onboardingHint"));
   setText("brandTitle", tr("appTitle"));
   setText("brandSubtitle", tr("appSubtitle"));
-  setText("refresh", tr("refresh"));
+  if (!isDashboardPage) {
+    setText("refresh", tr("refresh"));
+  }
   setText("hint", tr("waitingHint"));
   setText("progressText", tr("waitingProgress"));
   setText("chartSectionTitle", tr("chart"));
@@ -1322,11 +1344,316 @@ function renderTopBlocks(data) {
   const root = $("#topBlocks");
   if (!root) return;
   const metrics = buildTopBlockMetrics(data);
-  const blocks = Array.isArray(currentAppSettings?.top_blocks) && currentAppSettings.top_blocks.length
-    ? currentAppSettings.top_blocks.slice(0, 2)
-    : DEFAULT_SETTINGS.top_blocks;
+  const blocks = isDashboardPage
+    ? Array.from(AVAILABLE_TOP_BLOCKS)
+    : (Array.isArray(currentAppSettings?.top_blocks) && currentAppSettings.top_blocks.length
+      ? currentAppSettings.top_blocks.slice(0, 2)
+      : DEFAULT_SETTINGS.top_blocks);
 
   root.innerHTML = blocks.map((key) => renderTopBlockByKey(key, metrics)).join("");
+}
+
+function parseMonthLabelRangeUtcPlus3(label) {
+  const match = String(label || "").match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
+  const startUtcMs = Date.UTC(year, month - 1, 1, -3, 0, 0, 0);
+  const endUtcMs = Date.UTC(year, month, 1, -3, 0, 0, 0) - 1;
+  return { startUtcMs, endUtcMs };
+}
+
+function getHeatmapScaleTitle(scale = currentChartScale) {
+  if (scale === "24h") return currentLanguage === "en" ? "Sales heatmap · 24 hours" : "Heatmap продаж · 24 часа";
+  if (scale === "7d") return currentLanguage === "en" ? "Sales heatmap · 7 days" : "Heatmap продаж · 7 дней";
+  if (scale === "30d") return currentLanguage === "en" ? "Sales heatmap · 30 days" : "Heatmap продаж · 30 дней";
+  return currentLanguage === "en" ? "Sales heatmap · visible range" : "Heatmap продаж · видимый диапазон";
+}
+
+function formatHeatmapDayLabel(date) {
+  return new Intl.DateTimeFormat(getUiLocale(), {
+    day: "numeric",
+    month: "short"
+  }).format(date);
+}
+
+function getWeekdayShortLabels() {
+  return currentLanguage === "en"
+    ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    : ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+}
+
+function getHeatmapScaleConfig(scale, objects) {
+  const sixHourLabels = ["00-06", "06-12", "12-18", "18-24"];
+
+  if (scale === "24h") {
+    return {
+      mode: "compact-24h",
+      columnLabels: sixHourLabels,
+      rowLabels: [currentLanguage === "en" ? "24h" : "24ч"],
+      getColumnIndex(mskDate) {
+        return Math.max(0, Math.min(3, Math.floor(mskDate.getUTCHours() / 6)));
+      },
+      getRowIndex() {
+        return 0;
+      }
+    };
+  }
+
+  if (scale === "7d") {
+    const end = new Date();
+    const endMsk = new Date(end.getTime() + 3 * 60 * 60 * 1000);
+    endMsk.setUTCHours(0, 0, 0, 0);
+    const startMskMs = endMsk.getTime() - 6 * 24 * 60 * 60 * 1000;
+    const columnDates = Array.from({ length: 7 }, (_, index) => new Date(startMskMs + index * 24 * 60 * 60 * 1000));
+    const columnKeyToIndex = new Map(columnDates.map((date, index) => [date.toISOString().slice(0, 10), index]));
+
+    return {
+      mode: "recent-days",
+      columnLabels: columnDates.map(formatHeatmapDayLabel),
+      rowLabels: sixHourLabels,
+      getColumnIndex(mskDate) {
+        return columnKeyToIndex.get(mskDate.toISOString().slice(0, 10)) ?? -1;
+      },
+      getRowIndex(mskDate) {
+        return Math.max(0, Math.min(3, Math.floor(mskDate.getUTCHours() / 6)));
+      }
+    };
+  }
+
+  const weekdayLabels = getWeekdayShortLabels();
+  return {
+    mode: "weekday-pattern",
+    columnLabels: weekdayLabels,
+    rowLabels: sixHourLabels,
+    getColumnIndex(mskDate) {
+      return (mskDate.getUTCDay() + 6) % 7;
+    },
+    getRowIndex(mskDate) {
+      return Math.max(0, Math.min(3, Math.floor(mskDate.getUTCHours() / 6)));
+    }
+  };
+}
+
+function buildHeatmapModel(objects, scale) {
+  const config = getHeatmapScaleConfig(scale, objects);
+  const matrix = Array.from({ length: config.rowLabels.length }, () => Array(config.columnLabels.length).fill(0));
+
+  for (const item of Array.isArray(objects) ? objects : []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt || Number.isNaN(dt.getTime())) continue;
+    const mskDate = new Date(dt.getTime() + 3 * 60 * 60 * 1000);
+    const columnIndex = config.getColumnIndex(mskDate);
+    const rowIndex = config.getRowIndex(mskDate);
+    if (rowIndex < 0 || columnIndex < 0) continue;
+    if (!matrix[rowIndex] || typeof matrix[rowIndex][columnIndex] !== "number") continue;
+    matrix[rowIndex][columnIndex] += 1;
+  }
+
+  let max = 0;
+  let min = Number.POSITIVE_INFINITY;
+  let hottest = null;
+  let total = 0;
+  for (let rowIndex = 0; rowIndex < matrix.length; rowIndex += 1) {
+    for (let columnIndex = 0; columnIndex < matrix[rowIndex].length; columnIndex += 1) {
+      const value = matrix[rowIndex][columnIndex];
+      total += value;
+      if (value > max) max = value;
+      if (value < min) min = value;
+      if (!hottest || value > hottest.value) {
+        hottest = {
+          value,
+          rowIndex,
+          columnIndex
+        };
+      }
+    }
+  }
+
+  return {
+    mode: config.mode,
+    columnLabels: config.columnLabels,
+    rowLabels: config.rowLabels,
+    matrix,
+    min: Number.isFinite(min) ? min : 0,
+    max,
+    total,
+    hottest
+  };
+}
+
+function getHeatmapSummaryText(model) {
+  if (!model?.hottest || !model.hottest.value) {
+    return currentLanguage === "en" ? "No active slots in this range" : "В выбранном диапазоне нет активных слотов";
+  }
+  const columnLabel = model.columnLabels[model.hottest.columnIndex] || "—";
+  const rowLabel = model.rowLabels[model.hottest.rowIndex] || "—";
+  if (model.mode === "compact-24h") {
+    if (currentLanguage === "en") {
+      return `Peak slot: ${columnLabel} · ${fmtNumber(model.hottest.value)} sales`;
+    }
+    return `Пиковый слот: ${columnLabel} · ${fmtNumber(model.hottest.value)} продаж`;
+  }
+  if (currentLanguage === "en") {
+    return `Peak slot: ${columnLabel} · ${rowLabel} · ${fmtNumber(model.hottest.value)} sales`;
+  }
+  return `Пиковый слот: ${columnLabel} · ${rowLabel} · ${fmtNumber(model.hottest.value)} продаж`;
+}
+
+function getHeatmapFilteredObjects(data, scale = currentChartScale) {
+  const objects = Array.isArray(cachedSalesObjects) ? cachedSalesObjects : [];
+  if (!objects.length) return [];
+
+  const nowMs = Date.now();
+  const windows = {
+    "24h": { start: nowMs - 24 * 60 * 60 * 1000, end: nowMs },
+    "7d": { start: nowMs - 7 * 24 * 60 * 60 * 1000, end: nowMs },
+    "30d": { start: nowMs - 30 * 24 * 60 * 60 * 1000, end: nowMs }
+  };
+
+  if (scale !== "all") {
+    const range = windows[scale] || windows["30d"];
+    return objects.filter((item) => {
+      const dt = parseDateUtcPlus3(item?.date);
+      const time = dt?.getTime?.();
+      return Number.isFinite(time) && time >= range.start && time < range.end;
+    });
+  }
+
+  const overviewMonthly = getOverviewMonthlySeries(data);
+  const overviewViewport = getOverviewViewportForScale("all");
+  const visibleSeries = getOverviewVisibleSeries(overviewMonthly, overviewViewport);
+  if (!visibleSeries.labels?.length) return objects;
+
+  const firstLabel = visibleSeries.labels[0];
+  const lastLabel = visibleSeries.labels[visibleSeries.labels.length - 1];
+  const startRange = parseMonthLabelRangeUtcPlus3(firstLabel);
+  const endRange = parseMonthLabelRangeUtcPlus3(lastLabel);
+  if (!startRange || !endRange) return objects;
+
+  return objects.filter((item) => {
+    const dt = parseDateUtcPlus3(item?.date);
+    const time = dt?.getTime?.();
+    return Number.isFinite(time) && time >= startRange.startUtcMs && time <= endRange.endUtcMs;
+  });
+}
+
+function renderSalesHeatmap(data, scale = currentChartScale) {
+  const root = $("#salesHeatmap");
+  const titleEl = $("#heatmapTitle");
+  if (!root) return;
+  if (titleEl) {
+    titleEl.textContent = getHeatmapScaleTitle(scale);
+  }
+  const objects = getHeatmapFilteredObjects(data, scale);
+  const model = buildHeatmapModel(objects, scale);
+  if (!objects.length || !model.max) {
+    root.innerHTML = `<div class="sales-heatmap-empty">${tr("noData")}</div>`;
+    return;
+  }
+
+  const gridClass = model.mode === "compact-24h"
+    ? "sales-heatmap-grid sales-heatmap-grid-24h"
+    : "sales-heatmap-grid";
+  const columnHeader = model.columnLabels.map((label) => `<div class="sales-heatmap-day">${label}</div>`).join("");
+  const rows = model.rowLabels.map((rowLabel, rowIndex) => {
+    const cells = model.columnLabels.map((columnLabel, columnIndex) => {
+      const count = model.matrix[rowIndex][columnIndex];
+      const span = Math.max(1, model.max - model.min);
+      const normalized = span === 0 ? 1 : (count - model.min) / span;
+      const eased = Math.pow(Math.max(0, Math.min(1, normalized)), 0.9);
+      const darkAlpha = (0.42 - eased * 0.28).toFixed(3);
+      const lightAlpha = (0.03 + eased * 0.17).toFixed(3);
+      const borderMix = `${Math.round(26 + eased * 34)}%`;
+      const shadowAlpha = (0.03 + eased * 0.08).toFixed(3);
+      const tooltip = model.mode === "compact-24h"
+        ? `${columnLabel} • ${fmtNumber(count)} ${tr("salesWord")}`
+        : `${columnLabel} • ${rowLabel} • ${fmtNumber(count)} ${tr("salesWord")}`;
+      const valueHtml = count > 0 && model.mode === "compact-24h"
+        ? `<span class="sales-heatmap-cell-value">${fmtNumber(count)}</span>`
+        : "";
+      return `<div class="sales-heatmap-cell" style="--heat-dark-alpha:${darkAlpha};--heat-light-alpha:${lightAlpha};--heat-border-mix:${borderMix};--heat-shadow-alpha:${shadowAlpha}" title="${escapeAttr(tooltip)}" aria-label="${escapeAttr(tooltip)}">${valueHtml}</div>`;
+    }).join("");
+    return `<div class="sales-heatmap-row"><div class="sales-heatmap-time">${rowLabel}</div>${cells}</div>`;
+  }).join("");
+
+  root.innerHTML = `
+    <div class="sales-heatmap-summary">
+      <span class="sales-heatmap-summary-total">${currentLanguage === "en" ? "Sales in range" : "Продаж в диапазоне"}: <b>${fmtNumber(model.total)}</b></span>
+      <span class="sales-heatmap-summary-peak">${getHeatmapSummaryText(model)}</span>
+    </div>
+    <div class="${gridClass}">
+      <div class="sales-heatmap-corner"></div>
+      ${columnHeader}
+      ${rows}
+    </div>
+    <div class="sales-heatmap-legend">
+      <span>${currentLanguage === "en" ? "Lower activity" : "Меньше продаж"}</span>
+      <div class="sales-heatmap-legend-bar" aria-hidden="true"></div>
+      <span>${currentLanguage === "en" ? "Higher activity" : "Больше продаж"}</span>
+    </div>
+  `;
+}
+
+function renderDashboardHero(data) {
+  const nameEl = $("#dashboardGreetingName");
+  const balanceEl = $("#dashboardBalance");
+  const avatarEl = $("#dashboardAvatar");
+  const avatarWrapEl = $("#dashboardAvatarWrap");
+  const leadEl = $("#dashboardHeroLead");
+  const balanceLabelEl = $("#dashboardBalanceLabel");
+  const quickActionsTitleEl = $("#dashboardQuickActionsTitle");
+  const refreshBtnEl = $("#refresh");
+  if (!nameEl && !balanceEl && !avatarEl) return;
+
+  const profile = data?.meta?.authorProfile || null;
+  const rawName = String(profile?.name || "").trim();
+  const rawBalance = decodeHtmlEntitiesBasic(String(profile?.balance || "").trim())
+    .replace(/&amp;#8381;|&#8381;/g, "₽");
+  const safeName = rawName || (currentLanguage === "en" ? "author" : "автор");
+  const greetingPrefix = currentLanguage === "en" ? "Hello" : "Привет";
+  const leadText = currentLanguage === "en"
+    ? "This dashboard brings together your key metrics, sales dynamics, top-performing models, and the activity heatmap in one full-screen workspace."
+    : "Здесь собраны твои ключевые метрики, динамика продаж, лучшие модели и тепловая карта активности в одном полноценном рабочем кабинете.";
+
+  if (nameEl) {
+    nameEl.textContent = `${greetingPrefix}, ${safeName}`;
+  }
+  if (leadEl) {
+    leadEl.textContent = leadText;
+  }
+  if (balanceLabelEl) {
+    balanceLabelEl.textContent = currentLanguage === "en" ? "Balance" : "Баланс";
+  }
+  if (quickActionsTitleEl) {
+    quickActionsTitleEl.textContent = currentLanguage === "en" ? "Quick actions" : "Быстрые действия";
+  }
+  if (refreshBtnEl && isDashboardPage) {
+    const refreshTitle = tr("refresh");
+    refreshBtnEl.setAttribute("title", refreshTitle);
+    refreshBtnEl.setAttribute("aria-label", refreshTitle);
+  }
+  if (balanceEl) {
+    balanceEl.textContent = rawBalance || "—";
+  }
+  if (avatarEl) {
+    const avatar = String(profile?.avatar || "").trim();
+    if (avatar) {
+      avatarEl.src = avatar;
+      avatarEl.alt = safeName;
+      avatarEl.style.display = "block";
+      avatarWrapEl?.classList.remove("is-fallback");
+    } else {
+      avatarEl.removeAttribute("src");
+      avatarEl.alt = "";
+      avatarEl.style.display = "none";
+      avatarWrapEl?.classList.add("is-fallback");
+    }
+  }
+  if (avatarWrapEl && (!profile?.avatar || !String(profile.avatar).trim())) {
+    avatarWrapEl.setAttribute("data-initial", safeName.slice(0, 1).toUpperCase());
+  }
 }
 
 /* Chart helpers */
@@ -2264,6 +2591,7 @@ function rerenderCurrentDashboard() {
 function rerenderChartView({ persist = false } = {}) {
   if (!lastData) return;
   renderChart(lastData, currentChartScale);
+  renderSalesHeatmap(lastData, currentChartScale);
   if (persist) persistPopupUiState();
 }
 
@@ -2374,11 +2702,13 @@ function renderAll(data, updatedAt = null) {
   $("#modelsTotalCount").textContent = String(lastData?.stats?.totalSalesAll ?? 0);
   $("#modelsUniqueCount").textContent = String(lastData?.stats?.uniqueModelsAll ?? 0);
 
+  renderDashboardHero(lastData);
   renderTopBlocks(lastData);
   setTabActive($("#chartTabs"), currentChartScale);
   setTabActive($("#topTabs"), currentTopScale);
   renderChart(lastData, currentChartScale);
   renderTopModels(lastData, currentTopScale);
+  renderSalesHeatmap(lastData);
   applyRenderStatusMeta(getRenderStatusMeta(lastData, updatedAt), lastData);
   resetProgressVisuals();
   statusLineEl.classList.remove("live");
@@ -2735,6 +3065,11 @@ function wireRuntimeListeners() {
 
 async function applyPopupDisplayMode() {
   try {
+    if (isDashboardPage) {
+      document.body.classList.add("dashboard-page");
+      document.body.classList.remove("page-mode");
+      return;
+    }
     const currentTab = await getCurrentTabCompat();
     if (currentTab?.id) {
       document.body.classList.add("page-mode");
@@ -2785,7 +3120,7 @@ function wireActions() {
   });
 
   $("#openTabBtn")?.addEventListener("click", () => {
-    extApi.tabs.create({ url: extApi.runtime.getURL("popup.html") });
+    extApi.tabs.create({ url: extApi.runtime.getURL("dashboard.html") });
   });
 
   $("#telegramLink")?.addEventListener("click", () => {

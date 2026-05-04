@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3DStat Dashboard</title>
+  <link rel="stylesheet" href="themes.css" />
+  <link rel="stylesheet" href="popup.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body class="booting dashboard-page">
+  <section id="onboarding" class="shell dashboard-onboarding" aria-label="Первый запуск">
+    <div class="welcome" role="region" aria-labelledby="welcomeTitle">
+      <div class="welcome-kicker" id="welcomeKicker">Первый запуск</div>
+      <h1 id="welcomeTitle">Вся статистика хранится только у тебя</h1>
+      <p id="welcomeLead">Расширение собирает данные по продажам и сохраняет их локально в кэше браузера. Никто, кроме тебя, не получает к ним доступ!</p>
+      <ul class="welcome-list">
+        <li>
+          <b id="welcomeLocalTitle">Локальное хранение</b>
+          <span id="welcomeLocalText">Вся статистика, история продаж и собранные данные остаются внутри браузера на этом компьютере. Никакие внешние серверы расширения их не получают.</span>
+        </li>
+        <li>
+          <b id="welcomeCollectTitle">Как собираются данные</b>
+          <span id="welcomeCollectText">Сначала читаем свежие продажи из «Списка продаж», затем проверяем «Историю выплат» и дособираем продажи, которые уже исчезли из свежего списка.</span>
+        </li>
+        <li>
+          <b id="welcomeUpdatesTitle">Обновления под контролем</b>
+          <span id="welcomeUpdatesText">После первичной сборки данные обновляются только по кнопке «Обновить». Во время загрузки сверху будет виден статус этапа и прогресс.</span>
+        </li>
+      </ul>
+      <div class="welcome-actions">
+        <button id="startSetup" class="action-btn" type="button">Собрать статистику</button>
+        <div class="muted" id="welcomeHint">Первичная загрузка может занять немного времени, если история продаж большая.</div>
+      </div>
+    </div>
+  </section>
+
+  <main id="dashboardShell" class="shell dashboard-shell" aria-label="Основная панель">
+    <div class="dashboard-layout">
+      <aside class="dashboard-sidebar card" aria-label="Навигация">
+        <div class="dashboard-sidebar-brand">
+          <div class="brand-mark"><img src="icons/Icon.png" alt="" /></div>
+          <div>
+            <div class="title" id="brandTitle">3DStat</div>
+            <div class="subtitle" id="brandSubtitle">Твоя личная статистика продаж</div>
+          </div>
+        </div>
+
+        <nav class="dashboard-nav">
+          <button class="dashboard-nav-item active" type="button">Overview</button>
+          <button class="dashboard-nav-item" type="button">Analytics</button>
+          <button class="dashboard-nav-item" type="button">Messages</button>
+          <button class="dashboard-nav-item" type="button">Models</button>
+          <button class="dashboard-nav-item" type="button">System</button>
+        </nav>
+
+        <div class="dashboard-sidebar-note">
+          <div class="dashboard-sidebar-note-label">Верхние блоки</div>
+          <div class="dashboard-sidebar-note-value">Все 8 метрик доступны на dashboard</div>
+        </div>
+
+        <div class="dashboard-sidebar-actions">
+          <button class="action-btn secondary" id="settingsBtn" type="button">
+            <span class="action-icon" aria-hidden="true">⌘</span>
+            <span id="settingsBtnText">Настройки</span>
+          </button>
+        </div>
+      </aside>
+
+      <div class="dashboard-main">
+        <header class="dashboard-hero card">
+          <button class="dashboard-refresh-btn" id="refresh" type="button" aria-label="Обновить" title="Обновить">↻</button>
+          <div class="dashboard-hero-copy">
+            <div class="dashboard-greeting">
+              <div class="dashboard-avatar" id="dashboardAvatarWrap">
+                <img id="dashboardAvatar" class="dashboard-avatar-image" alt="" />
+              </div>
+              <div class="dashboard-greeting-copy">
+                <h1 class="dashboard-title" id="dashboardGreetingName">Автор</h1>
+              </div>
+            </div>
+            <div class="dashboard-hero-body">
+              <p class="dashboard-lead" id="dashboardHeroLead">Здесь собраны твои ключевые метрики, динамика продаж, лучшие модели и тепловая карта активности. Это уже не popup, а нормальный рабочий кабинет автора.</p>
+              <div class="dashboard-balance-card">
+                <div class="dashboard-balance-label" id="dashboardBalanceLabel">Баланс</div>
+                <div class="dashboard-balance-value" id="dashboardBalance">—</div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="metrics-grid dashboard-metrics" id="topBlocks" aria-label="Верхние показатели"></section>
+
+        <section class="section dashboard-chart-section" aria-labelledby="chartSectionTitle">
+          <div class="section-header">
+            <div class="section-title" id="chartSectionTitle">График</div>
+            <div class="tabs" id="chartTabs">
+              <button class="tab" data-scale="24h" id="chartTab24h">24 часа</button>
+              <button class="tab" data-scale="7d" id="chartTab7d">7 дней</button>
+              <button class="tab active" data-scale="30d" id="chartTab30d">30 дней</button>
+              <button class="tab" data-scale="all" id="chartTabAll">Всё время</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-wrap-inner" id="chartWrapInner">
+              <canvas id="chart" width="900" height="320"></canvas>
+              <div id="chartTooltip" class="chart-tooltip">
+                <div id="chartTooltipDate" class="chart-tooltip-date"></div>
+                <div id="chartTooltipSum" class="chart-tooltip-sum"></div>
+              </div>
+            </div>
+            <div class="chart-nav">
+              <div class="chart-nav-head">
+                <span id="chartScaleLabel">Масштаб</span>
+                <div class="chart-nav-actions">
+                  <button id="chartZoomLabel" class="icon-btn" type="button" title="Показать всё время" aria-label="Показать всё время">Всё</button>
+                  <div class="chart-stepper">
+                    <button id="chartMonthPrev" class="icon-btn" type="button" title="Предыдущий месяц" aria-label="Предыдущий месяц">‹</button>
+                    <button id="chartMonthMode" class="icon-btn chart-month-preset" type="button" title="Показать 1 месяц" aria-label="Показать 1 месяц" data-months="1">1м</button>
+                    <button id="chartQuarterMode" class="icon-btn chart-month-preset" type="button" title="Показать 3 месяца" aria-label="Показать 3 месяца" data-months="3">3м</button>
+                    <button id="chartHalfYearMode" class="icon-btn chart-month-preset" type="button" title="Показать 6 месяцев" aria-label="Показать 6 месяцев" data-months="6">6м</button>
+                    <button id="chartYearMode" class="icon-btn chart-month-preset" type="button" title="Показать 12 месяцев" aria-label="Показать 12 месяцев" data-months="12">12м</button>
+                    <button id="chartMonthNext" class="icon-btn" type="button" title="Следующий месяц" aria-label="Следующий месяц">›</button>
+                  </div>
+                </div>
+              </div>
+              <div class="mini-wrap" id="chartMiniWrap">
+                <canvas id="chartMini" class="mini-chart" width="900" height="124"></canvas>
+                <div id="chartViewport" class="viewport">
+                  <div class="viewport-handle left" data-handle="left"></div>
+                  <div class="viewport-grip"></div>
+                  <div class="viewport-handle right" data-handle="right"></div>
+                </div>
+              </div>
+            </div>
+            <div class="chart-summary" id="chartSummary"></div>
+          </div>
+        </section>
+
+        <div class="dashboard-lower-grid">
+          <section class="section list-card" aria-labelledby="topModelsSectionTitle">
+            <div class="section-header">
+              <div class="section-title" id="topModelsSectionTitle">Топ модели</div>
+              <div class="tabs" id="topTabs">
+                <button class="tab" data-scale="24h" id="topTab24h">24 часа</button>
+                <button class="tab" data-scale="7d" id="topTab7d">7 дней</button>
+                <button class="tab active" data-scale="30d" id="topTab30d">30 дней</button>
+                <button class="tab" data-scale="all" id="topTabAll">Всё время</button>
+              </div>
+            </div>
+            <div id="topList" class="list-shell"></div>
+          </section>
+
+          <section class="section dashboard-heatmap-section" aria-labelledby="heatmapTitle">
+            <div class="section-header">
+              <div class="section-title" id="heatmapTitle">Heatmap продаж</div>
+            </div>
+            <div id="salesHeatmap" class="sales-heatmap"></div>
+          </section>
+        </div>
+
+        <section class="section dashboard-messages-section" aria-labelledby="dashboardMessagesTitle">
+          <div class="section-header">
+            <div>
+              <div class="section-title" id="dashboardMessagesTitle">Сообщения</div>
+              <div class="dashboard-messages-subtitle">Тестовый каркас будущего мессенджера внутри dashboard.</div>
+            </div>
+            <button class="action-btn secondary dashboard-messages-ghost" type="button">Новый диалог</button>
+          </div>
+
+          <div class="dashboard-messages-shell">
+            <aside class="dashboard-inbox" aria-label="Список диалогов">
+              <div class="dashboard-inbox-search">
+                <input class="dashboard-inbox-search-input" type="text" value="" placeholder="Поиск по перепискам" />
+              </div>
+
+              <div class="dashboard-thread-list">
+                <button class="dashboard-thread-item active" type="button">
+                  <div class="dashboard-thread-avatar">M</div>
+                  <div class="dashboard-thread-copy">
+                    <div class="dashboard-thread-top">
+                      <span class="dashboard-thread-name">PolyPuff</span>
+                      <span class="dashboard-thread-time">14:32</span>
+                    </div>
+                    <div class="dashboard-thread-preview">Спасибо, купил и уже тестирую. Есть идея по фильтрам.</div>
+                  </div>
+                  <span class="dashboard-thread-badge">2</span>
+                </button>
+
+                <button class="dashboard-thread-item" type="button">
+                  <div class="dashboard-thread-avatar">A</div>
+                  <div class="dashboard-thread-copy">
+                    <div class="dashboard-thread-top">
+                      <span class="dashboard-thread-name">ChamferChill</span>
+                      <span class="dashboard-thread-time">12:08</span>
+                    </div>
+                    <div class="dashboard-thread-preview">Можно ли будет потом экспортировать статистику по категориям?</div>
+                  </div>
+                </button>
+
+                <button class="dashboard-thread-item" type="button">
+                  <div class="dashboard-thread-avatar">L</div>
+                  <div class="dashboard-thread-copy">
+                    <div class="dashboard-thread-top">
+                      <span class="dashboard-thread-name">UV_Bublik</span>
+                      <span class="dashboard-thread-time">Вчера</span>
+                    </div>
+                    <div class="dashboard-thread-preview">Спасибо за проделанную работу, интерфейс стал намного приятнее.</div>
+                  </div>
+                </button>
+
+                <button class="dashboard-thread-item" type="button">
+                  <div class="dashboard-thread-avatar">T</div>
+                  <div class="dashboard-thread-copy">
+                    <div class="dashboard-thread-top">
+                      <span class="dashboard-thread-name">VoxelVasya</span>
+                      <span class="dashboard-thread-time">Вчера</span>
+                    </div>
+                    <div class="dashboard-thread-preview">Если сделаешь чат в расширении, это будет вообще бомба.</div>
+                  </div>
+                </button>
+              </div>
+            </aside>
+
+            <div class="dashboard-chat">
+              <header class="dashboard-chat-head">
+                <div class="dashboard-chat-user">
+                  <div class="dashboard-chat-user-avatar">M</div>
+                  <div>
+                    <div class="dashboard-chat-user-name">PolyPuff</div>
+                    <div class="dashboard-chat-user-meta">Был в сети 5 минут назад</div>
+                  </div>
+                </div>
+                <div class="dashboard-chat-actions">
+                  <button class="icon-btn" type="button" aria-label="Закрепить">☆</button>
+                  <button class="icon-btn" type="button" aria-label="Информация">i</button>
+                </div>
+              </header>
+
+              <div class="dashboard-chat-body">
+                <div class="dashboard-chat-day">Сегодня</div>
+
+                <div class="dashboard-message-row">
+                  <div class="dashboard-message-bubble incoming">
+                    <div class="dashboard-message-text">Привет! Статистику уже поставил, интерфейс прям сильно вырос.</div>
+                    <div class="dashboard-message-meta">13:58</div>
+                  </div>
+                </div>
+
+                <div class="dashboard-message-row outgoing-row">
+                  <div class="dashboard-message-bubble outgoing">
+                    <div class="dashboard-message-text">Супер. Я как раз думаю над полноэкранной версией и блоком переписок внутри dashboard.</div>
+                    <div class="dashboard-message-meta">14:04</div>
+                  </div>
+                </div>
+
+                <div class="dashboard-message-row">
+                  <div class="dashboard-message-bubble incoming">
+                    <div class="dashboard-message-text">Если сделаешь отправку прямо отсюда, это будет ощущаться почти как отдельный клиент.</div>
+                    <div class="dashboard-message-meta">14:18</div>
+                  </div>
+                </div>
+
+                <div class="dashboard-message-row outgoing-row">
+                  <div class="dashboard-message-bubble outgoing">
+                    <div class="dashboard-message-text">Сначала хочу собрать нормальный каркас: список диалогов, пузырьки, ввод и потом уже цепляться к реальным данным.</div>
+                    <div class="dashboard-message-meta">14:22</div>
+                  </div>
+                </div>
+
+                <div class="dashboard-message-row">
+                  <div class="dashboard-message-bubble incoming">
+                    <div class="dashboard-message-text">Вот такой тестовый вариант уже выглядит очень живо. Дальше можно будет сделать почти телеграм-ритм.</div>
+                    <div class="dashboard-message-meta">14:32</div>
+                  </div>
+                </div>
+              </div>
+
+              <footer class="dashboard-chat-compose">
+                <div class="dashboard-chat-compose-wrap">
+                  <button class="icon-btn" type="button" aria-label="Вложение">+</button>
+                  <textarea class="dashboard-chat-input" rows="1" placeholder="Написать сообщение..."></textarea>
+                  <button class="action-btn dashboard-send-btn" type="button">Отправить</button>
+                </div>
+              </footer>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="dashboard-rail">
+        <section class="statusline dashboard-status" id="statusline" role="status" aria-live="polite" aria-atomic="true">
+          <div class="status-main" id="hint">Ожидает обновления</div>
+          <div class="status-sub" id="progressText">Последняя статистика появится здесь после загрузки.</div>
+          <div class="progressbar" id="progressbar"><span id="progressfill"></span></div>
+        </section>
+
+        <section class="meta-grid dashboard-meta-grid" aria-label="Сводные показатели">
+          <div class="card meta-card">
+            <div>
+              <div class="meta-card-label" id="modelsTotalLabel">Проданных моделей всего</div>
+              <div class="meta-card-value" id="modelsTotalCount">—</div>
+            </div>
+          </div>
+          <div class="card meta-card">
+            <div>
+              <div class="meta-card-label" id="modelsUniqueLabel">Уникальных моделей</div>
+              <div class="meta-card-value" id="modelsUniqueCount">—</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card dashboard-rail-card">
+          <div class="section-title" id="dashboardQuickActionsTitle">Быстрые действия</div>
+          <div class="dashboard-rail-actions">
+            <button class="action-btn secondary" id="langBtn" type="button">RU</button>
+          </div>
+        </section>
+
+        <section class="card dashboard-rail-card dashboard-mini-chat-card" aria-labelledby="dashboardMiniChatTitle">
+          <div class="dashboard-mini-chat-head">
+            <div>
+              <div class="section-title" id="dashboardMiniChatTitle">Текущий диалог</div>
+              <div class="dashboard-mini-chat-subtitle">Мини-окно активной переписки прямо в dashboard.</div>
+            </div>
+            <button class="icon-btn" type="button" aria-label="Открыть чат">↗</button>
+          </div>
+
+          <div class="dashboard-mini-chat-user">
+                  <div class="dashboard-chat-user-avatar">P</div>
+            <div>
+                    <div class="dashboard-chat-user-name">PolyPuff</div>
+              <div class="dashboard-chat-user-meta">онлайн недавно</div>
+            </div>
+          </div>
+
+          <div class="dashboard-mini-chat-body">
+            <div class="dashboard-message-row">
+              <div class="dashboard-message-bubble incoming">
+                <div class="dashboard-message-text">Привет! Уже тестирую новую версию, выглядит очень бодро.</div>
+                <div class="dashboard-message-meta">14:18</div>
+              </div>
+            </div>
+
+            <div class="dashboard-message-row outgoing-row">
+              <div class="dashboard-message-bubble outgoing">
+                <div class="dashboard-message-text">Сейчас как раз собираю каркас мессенджера внутри dashboard.</div>
+                <div class="dashboard-message-meta">14:22</div>
+              </div>
+            </div>
+
+            <div class="dashboard-message-row">
+              <div class="dashboard-message-bubble incoming">
+                <div class="dashboard-message-text">Мини-чат справа тоже звучит удобно для быстрых ответов.</div>
+                <div class="dashboard-message-meta">14:27</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-mini-chat-compose">
+            <textarea class="dashboard-chat-input dashboard-mini-chat-input" rows="1" placeholder="Быстрый ответ..."></textarea>
+            <button class="action-btn dashboard-send-btn" type="button">↗</button>
+          </div>
+        </section>
+
+        <div class="status" id="status" role="status" aria-live="polite" aria-atomic="true"></div>
+      </aside>
+    </div>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
