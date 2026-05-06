@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   avgLine: false,
   trendLine: false,
   splitSiteLines: false,
+  previousPeriodLine: false,
   topBlocksCalendarMode: false,
   topBlocksCalendarCompareFullPeriod: false
 };
@@ -61,6 +62,14 @@ let currentChartScale = "30d";
 let currentTopScale = "30d";
 let refreshInProgress = false;
 let chartViewportInitialized = false;
+const TOP_MODELS_STEP = 5;
+const TOP_MODELS_MAX_VISIBLE = 20;
+const topModelsVisibleByScale = {
+  "24h": TOP_MODELS_STEP,
+  "7d": TOP_MODELS_STEP,
+  "30d": TOP_MODELS_STEP,
+  "all": TOP_MODELS_STEP
+};
 const chartViewportByScale = {
   "24h": { start: 0, size: 1 },
   "7d": { start: 0, size: 1 },
@@ -175,6 +184,8 @@ const I18N = {
     waitingProgress: "Последняя статистика появится здесь после загрузки.",
     chart: "График",
     topModels: "Топ модели",
+    topModelsLoadMore: "Загрузить ещё",
+    topModelsCollapse: "Свернуть",
     tab24h: "24 часа",
     tab7d: "7 дней",
     tab30d: "30 дней",
@@ -227,6 +238,7 @@ const I18N = {
     previousFullCalendarMonth: "За прошлый месяц",
     previousTopFullCalendarWeek: "У этой модели за прошлую неделю",
     previousTopFullCalendarMonth: "У этой модели за прошлый месяц",
+    previousPeriod: "Прошлый период",
     previousPeriodRevenue: "{label}: {amount}",
     previousPeriodSales: "{label}: {count} продаж",
     vsPrevDay: "к предыдущим 24 часам",
@@ -291,6 +303,8 @@ const I18N = {
     waitingProgress: "Your latest statistics will appear here after loading.",
     chart: "Chart",
     topModels: "Top models",
+    topModelsLoadMore: "Load more",
+    topModelsCollapse: "Collapse",
     tab24h: "24 hours",
     tab7d: "7 days",
     tab30d: "30 days",
@@ -343,6 +357,7 @@ const I18N = {
     previousFullCalendarMonth: "Last month",
     previousTopFullCalendarWeek: "This model last week",
     previousTopFullCalendarMonth: "This model last month",
+    previousPeriod: "Previous period",
     previousPeriodRevenue: "{label}: {amount}",
     previousPeriodSales: "{label}: {count} sales",
     vsPrevDay: "vs previous 24 hours",
@@ -686,17 +701,19 @@ function sanitizeAppSettings(raw = {}) {
   settings.top_blocks = settings.top_blocks
     .map((item) => String(item || "").trim())
     .filter((item) => item && AVAILABLE_TOP_BLOCKS.has(item))
-    .slice(0, 2);
-  if (!settings.top_blocks.length) {
-    settings.top_blocks = [...DEFAULT_SETTINGS.top_blocks];
-  }
+    .slice(0, 4);
   if (!AVAILABLE_CHART_STYLES.has(String(settings.chart_style || ""))) {
     settings.chart_style = DEFAULT_SETTINGS.chart_style;
   }
   settings.avgLine = !!settings.avgLine;
   settings.trendLine = !!settings.trendLine;
   settings.splitSiteLines = !!settings.splitSiteLines;
+  settings.previousPeriodLine = !!settings.previousPeriodLine;
   if (settings.splitSiteLines) {
+    settings.avgLine = false;
+    settings.trendLine = false;
+    settings.previousPeriodLine = false;
+  } else if (settings.previousPeriodLine) {
     settings.avgLine = false;
     settings.trendLine = false;
   } else if (settings.avgLine && settings.trendLine) {
@@ -1231,13 +1248,15 @@ function metricBadgeHtml(deltaText, cls, hideIcon = false, tooltipText = "") {
 function metricCardHtml(title, amount, deltaText, deltaCls, note, hideIcon = false, tooltipText = "") {
   return `
     <div class="card metric-card">
-      <div>
-        <div class="metric-title">${title}</div>
-        ${metricValueHtml(amount)}
-      </div>
-      <div class="metric-footer">
-        ${metricBadgeHtml(deltaText, deltaCls, hideIcon, tooltipText)}
-        <div class="metric-note">${note}</div>
+      <div class="metric-card-main">
+        <div>
+          <div class="metric-title">${title}</div>
+          ${metricValueHtml(amount)}
+        </div>
+        <div class="metric-footer">
+          ${metricBadgeHtml(deltaText, deltaCls, hideIcon, tooltipText)}
+          <div class="metric-note">${note}</div>
+        </div>
       </div>
     </div>
   `;
@@ -1607,9 +1626,12 @@ function renderTopBlocks(data) {
   if (!root) return;
   const metrics = buildTopBlockMetrics(data);
   const blocks = Array.isArray(currentAppSettings?.top_blocks) && currentAppSettings.top_blocks.length
-    ? currentAppSettings.top_blocks.slice(0, 2)
-    : DEFAULT_SETTINGS.top_blocks;
+    ? currentAppSettings.top_blocks.slice(0, 4)
+    : [];
 
+  root.hidden = blocks.length === 0;
+  root.classList.toggle("metrics-grid-single", blocks.length === 1);
+  root.classList.toggle("metrics-grid-three", blocks.length === 3);
   root.innerHTML = blocks.map((key) => renderTopBlockByKey(key, metrics)).join("");
 }
 
@@ -1986,9 +2008,13 @@ function drawLineChart(canvas, labels, values, options = {}) {
   const splitSeries = options?.splitSeries && Array.isArray(options.splitSeries.dddValues) && Array.isArray(options.splitSeries.skyValues)
     ? options.splitSeries
     : null;
+  const previousPeriod = options?.previousPeriod && Array.isArray(options.previousPeriod.values) && options.previousPeriod.values.length === values.length
+    ? options.previousPeriod
+    : null;
+  const previousPeriodSeries = previousPeriod?.values || null;
   const allSeriesValues = splitSeries
     ? (splitSeries.dddValues || []).concat(splitSeries.skyValues || [])
-    : values;
+    : values.concat(previousPeriodSeries || []);
   const rawMax = Math.max(...allSeriesValues);
   const rawMin = Math.min(...allSeriesValues);
   let maxV = rawMax;
@@ -2034,6 +2060,16 @@ function drawLineChart(canvas, labels, values, options = {}) {
   let averageValue = Number.isFinite(options.avgValue) ? Number(options.avgValue) : null;
   let averageY = null;
   let splitPoints = null;
+  let previousPeriodPoints = null;
+
+  if (previousPeriodSeries) {
+    previousPeriodPoints = previousPeriodSeries.map((value, i) => ({
+      x: style === "bar"
+        ? padL + barSlotWidth * (i + 0.5)
+        : padL + (previousPeriodSeries.length === 1 ? innerW : (i / (previousPeriodSeries.length - 1)) * innerW),
+      y: valueToChartY(Number(value || 0), minV, range, padT, innerH)
+    }));
+  }
 
   if (style === "bar") {
     const gap = Math.max(2, Math.min(8, barSlotWidth * 0.22));
@@ -2205,6 +2241,19 @@ function drawLineChart(canvas, labels, values, options = {}) {
     }
   }
 
+  if (previousPeriodPoints?.length) {
+    ctx.save();
+    ctx.strokeStyle = themeColor("--chart-trend-line", "rgba(100,116,139,0.8)");
+    ctx.lineWidth = (style === "smooth" || style === "bar") ? 2 : 1.7;
+    ctx.setLineDash([7, 6]);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    traceSeriesPath(ctx, previousPeriodPoints, style === "bar" ? "smooth" : style);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   if (currentAppSettings.avgLine) {
     if (averageValue != null) {
       averageY = valueToChartY(averageValue, minV, range, padT, innerH);
@@ -2310,6 +2359,9 @@ function drawLineChart(canvas, labels, values, options = {}) {
     averageValue,
     averageY,
     splitSeries,
+    previousPeriod,
+    previousPeriodSeries,
+    previousPeriodPoints,
     splitCountSeries: options?.splitCountSeries || null
   };
 }
@@ -2420,6 +2472,7 @@ function syncSelectedPointTooltip(tooltip, dateEl, sumEl, renderState) {
   const label = renderState.labels?.[chartSelection.index];
   const value = renderState.values?.[chartSelection.index];
   const count = Math.max(0, Math.round(Number(renderState.counts?.[chartSelection.index] || 0)));
+  const previousValue = Number(renderState.previousPeriodSeries?.[chartSelection.index] || 0);
   if (!point || label == null || value == null) {
     hideChartTooltip();
     return;
@@ -2437,7 +2490,13 @@ function syncSelectedPointTooltip(tooltip, dateEl, sumEl, renderState) {
       `<span>3DSky: ${rub(skyValue)} (${fmtNumber(skyCount)})</span>`
     ].join("<br>");
   } else {
-    sumEl.innerHTML = tr("chartSalesValue", { value: `${rub(value)} (${fmtNumber(count)})` });
+    const lines = [
+      tr("chartSalesValue", { value: `${rub(value)} (${fmtNumber(count)})` })
+    ];
+    if (currentAppSettings.previousPeriodLine && renderState.previousPeriodSeries) {
+      lines.push(`<span>${tr("previousPeriodRevenue", { label: tr("previousPeriod"), amount: rub(previousValue) })}</span>`);
+    }
+    sumEl.innerHTML = lines.join("<br>");
   }
 
   const wrap = $("#chartWrapInner");
@@ -2707,6 +2766,69 @@ function buildChartCountSeries(scale, adaptiveSeries, renderSeries) {
   return counts;
 }
 
+function getChartTimeBounds(scale, renderSeries) {
+  const fixedBounds = getSplitLineTimeBounds(scale);
+  if (fixedBounds) return fixedBounds;
+  const labels = Array.isArray(renderSeries?.labels) ? renderSeries.labels : [];
+  if (!labels.length) return null;
+  if (renderSeries?.mode === "month") {
+    const first = getMonthRange(labels[0]);
+    const last = getMonthRange(labels[labels.length - 1]);
+    if (!first || !last) return null;
+    return {
+      start: first.start.getTime(),
+      end: last.end.getTime() + 1
+    };
+  }
+  if (renderSeries?.mode === "day") {
+    const first = parseMskDayLabelRange(labels[0]);
+    const last = parseMskDayLabelRange(labels[labels.length - 1]);
+    if (!first || !last) return null;
+    return {
+      start: first.start.getTime(),
+      end: last.end.getTime() + 1
+    };
+  }
+  return null;
+}
+
+function bucketRevenueSeries(objects, startMs, endMs, bucketCount) {
+  const safeCount = Math.max(1, Number(bucketCount) || 1);
+  const series = Array.from({ length: safeCount }, () => 0);
+  const span = Math.max(1, endMs - startMs);
+  for (const item of objects || []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (time < startMs || time >= endMs) continue;
+    const amount = Number(item?.royaltyAmount || 0);
+    if (!Number.isFinite(amount) || amount === 0) continue;
+    const ratio = (time - startMs) / span;
+    const index = clamp(Math.floor(ratio * safeCount), 0, safeCount - 1);
+    series[index] += amount;
+  }
+  return series.map((value) => roundMoney(value));
+}
+
+function buildPreviousPeriodSeries(scale, renderSeries) {
+  if (!currentAppSettings.previousPeriodLine || !Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
+    return null;
+  }
+  const labels = Array.isArray(renderSeries?.labels) ? renderSeries.labels : [];
+  if (!labels.length) return null;
+  const currentBounds = getChartTimeBounds(scale, renderSeries);
+  if (!currentBounds || !Number.isFinite(currentBounds.start) || !Number.isFinite(currentBounds.end)) {
+    return null;
+  }
+  const currentSpan = Math.max(1, currentBounds.end - currentBounds.start);
+  return bucketRevenueSeries(
+    cachedSalesObjects,
+    currentBounds.start - currentSpan,
+    currentBounds.start,
+    labels.length
+  );
+}
+
 function getChartRenderSeries(scale, chartStyle, adaptiveSeries) {
   if (chartStyle === "bar" && scale === "all") {
     return aggregateBarSeries(
@@ -2730,6 +2852,7 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
   const splitSeries = buildSplitLineSeries(scale, adaptiveSeries, renderSeries);
   const splitCountSeries = buildSplitCountSeries(scale, adaptiveSeries, renderSeries);
   const countSeries = buildChartCountSeries(scale, adaptiveSeries, renderSeries);
+  const previousPeriodSeries = buildPreviousPeriodSeries(scale, renderSeries);
   const renderState = drawLineChart($("#chart"), renderSeries.labels, renderSeries.values, {
     scale,
     mode: renderSeries.mode,
@@ -2738,7 +2861,8 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
     xTicks,
     selectedIndex,
     style: chartStyle,
-    splitSeries
+    splitSeries,
+    previousPeriod: previousPeriodSeries ? { values: previousPeriodSeries } : null
   });
   return Object.assign({}, renderState, {
     mode: renderSeries.mode,
@@ -2748,6 +2872,7 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
     values: renderSeries.values,
     counts: countSeries,
     splitSeries,
+    previousPeriodSeries,
     splitCountSeries
   });
 }
@@ -2851,6 +2976,27 @@ function createTopModelRow(item) {
   return row;
 }
 
+function getTopModelsVisibleCount(scale, totalCount = 0) {
+  const current = Number(topModelsVisibleByScale[scale] || TOP_MODELS_STEP);
+  return Math.max(0, Math.min(totalCount, Math.min(TOP_MODELS_MAX_VISIBLE, current)));
+}
+
+function createTopModelsToggleButton(scale, { nextVisibleCount, canLoadMore, canCollapse }) {
+  const wrap = document.createElement("div");
+  wrap.className = "top-list-actions";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn top-list-more-btn";
+  button.textContent = canLoadMore ? tr("topModelsLoadMore") : tr("topModelsCollapse");
+  button.addEventListener("click", () => {
+    topModelsVisibleByScale[scale] = canLoadMore ? nextVisibleCount : TOP_MODELS_STEP;
+    rerenderTopModelsView();
+  });
+  if (!canLoadMore && !canCollapse) return null;
+  wrap.appendChild(button);
+  return wrap;
+}
+
 function renderTopModels(data, scale) {
   const list = $("#topList");
   list.innerHTML = "";
@@ -2859,8 +3005,16 @@ function renderTopModels(data, scale) {
     list.appendChild(createTopModelEmptyState());
     return;
   }
-
-  items.forEach((item) => list.appendChild(createTopModelRow(item)));
+  const visibleCount = getTopModelsVisibleCount(scale, items.length);
+  items.slice(0, visibleCount).forEach((item) => list.appendChild(createTopModelRow(item)));
+  const maxVisibleCount = Math.min(items.length, TOP_MODELS_MAX_VISIBLE);
+  const nextVisibleCount = Math.min(maxVisibleCount, visibleCount + TOP_MODELS_STEP);
+  const canLoadMore = visibleCount < maxVisibleCount && nextVisibleCount > visibleCount;
+  const canCollapse = visibleCount >= maxVisibleCount && maxVisibleCount > TOP_MODELS_STEP;
+  const toggleButton = createTopModelsToggleButton(scale, { nextVisibleCount, canLoadMore, canCollapse });
+  if (toggleButton) {
+    list.appendChild(toggleButton);
+  }
 }
 
 function rerenderCurrentDashboard() {
@@ -2877,6 +3031,16 @@ function rerenderChartView({ persist = false } = {}) {
 function rerenderTopModelsView() {
   if (!lastData) return;
   renderTopModels(lastData, currentTopScale);
+}
+
+function resetTopModelsVisibleCount(scale = null) {
+  if (scale) {
+    topModelsVisibleByScale[scale] = TOP_MODELS_STEP;
+    return;
+  }
+  Object.keys(topModelsVisibleByScale).forEach((key) => {
+    topModelsVisibleByScale[key] = TOP_MODELS_STEP;
+  });
 }
 
 function showOnboarding() {
@@ -2974,6 +3138,7 @@ function renderAll(data, updatedAt = null) {
   const hadData = !!lastData;
   lastData = data;
   lastUpdatedAt = updatedAt;
+  resetTopModelsVisibleCount();
   if (!hadData && !chartViewportInitialized) {
     chartViewportByScale.all = { start: 0, size: 1 };
     chartViewportInitialized = true;

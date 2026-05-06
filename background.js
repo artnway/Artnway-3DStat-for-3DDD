@@ -2474,8 +2474,8 @@ function buildDashboard(objects) {
   };
 
   // Top lists
-  function buildTop(scaleKey, curMap, prevMapOrNull) {
-    const top = topN(curMap, 5);
+  function buildTop(curMap, prevMapOrNull) {
+    const top = topN(curMap, 20);
     const out = [];
     for (const m of top) {
       const prev = prevMapOrNull ? prevMapOrNull.get(m.slug || m.title) : null;
@@ -2495,10 +2495,10 @@ function buildDashboard(objects) {
   }
 
   const top = {
-    "24h": buildTop("24h", topMaps.h24.cur, topMaps.h24.prev),
-    "7d":  buildTop("7d", topMaps.d7.cur, topMaps.d7.prev),
-    "30d": buildTop("30d", topMaps.d30.cur, topMaps.d30.prev),
-    "all": buildTop("all", topMaps.all.cur, null)
+    "24h": buildTop(topMaps.h24.cur, topMaps.h24.prev),
+    "7d":  buildTop(topMaps.d7.cur, topMaps.d7.prev),
+    "30d": buildTop(topMaps.d30.cur, topMaps.d30.prev),
+    "all": buildTop(topMaps.all.cur, null)
   };
 
 // stats для UI (саммари под графиком + всего моделей)

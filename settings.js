@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   avgLine: false,
   trendLine: false,
   splitSiteLines: false,
+  previousPeriodLine: false,
   topBlocksCalendarMode: false,
   topBlocksCalendarCompareFullPeriod: false,
   autoRefresh: false
@@ -119,7 +120,7 @@ const I18N = {
     donateBtn: "На кофе",
     donateBtnAria: "Поддержать автора",
     topBlocksTitle: "Блоки вверху приложения",
-    topBlocksSub: "Можно выбрать только 2 блока.",
+    topBlocksSub: "Можно выбрать от 0 до 4 блоков.",
     topBlocksCalendarModeTitle: "Календарный режим периодов",
     topBlocksCalendarModeSub: "Для верхних блоков считать значения от начала суток, недели и месяца вместо плавающего окна.",
     topBlocksCalendarCompareModeTitle: "Считать процент по полному прошлому периоду",
@@ -141,7 +142,9 @@ const I18N = {
     trendLineSub: "Показывает общее направление графика за выбранный период: рост, снижение или стабильность.",
     splitSiteLinesTitle: "Разделить линии 3DDD и 3DSky",
     splitSiteLinesSub: "Показывает две отдельные линии дохода: одну для 3DDD и голубую для 3DSky.",
-    toggleMutualHint: "Среднюю линию и линию тренда нельзя включить одновременно.",
+    previousPeriodLineTitle: "Показывать прошлый период пунктиром",
+    previousPeriodLineSub: "Добавляет аккуратную пунктирную линию с продажами за прошлый аналогичный период.",
+    toggleMutualHint: "Для графика можно выбрать только один дополнительный режим.",
     autoRefreshTitle: "Автообновление",
     autoRefreshSub: "Автообновление последних данных",
     inDevelopment: "В разработке",
@@ -202,7 +205,7 @@ const I18N = {
     debugFetchFailed: "Не удалось получить диагностику",
     footerNote: "Настройки сохраняются локально и сразу применяются там, где логика уже подключена.",
     themeSaved: "Сохранено",
-    topBlockLimit: "Можно выбрать только 2 блока",
+    topBlockLimit: "Можно выбрать максимум 4 блока",
     debugUpdated: "Диагностика обновлена",
     debugCopied: "Диагностика скопирована",
     debugCopyFailed: "Не удалось скопировать",
@@ -278,7 +281,7 @@ const I18N = {
     donateBtn: "Buy me coffee",
     donateBtnAria: "Support the author",
     topBlocksTitle: "Top blocks in the app",
-    topBlocksSub: "You can select only 2 blocks.",
+    topBlocksSub: "You can select from 0 to 4 blocks.",
     topBlocksCalendarModeTitle: "Calendar-aligned periods",
     topBlocksCalendarModeSub: "For the top blocks, count values from the start of the day, week, and month instead of a rolling window.",
     topBlocksCalendarCompareModeTitle: "Calculate percent from the full previous period",
@@ -300,7 +303,9 @@ const I18N = {
     trendLineSub: "Shows the overall direction of the chart for the selected period: growth, decline, or stability.",
     splitSiteLinesTitle: "Split 3DDD and 3DSky lines",
     splitSiteLinesSub: "Shows two separate revenue lines: one for 3DDD and a light-blue one for 3DSky.",
-    toggleMutualHint: "The average line and the trend line cannot be enabled at the same time.",
+    previousPeriodLineTitle: "Show previous period as dashed",
+    previousPeriodLineSub: "Adds a neat dashed line with sales for the previous comparable period.",
+    toggleMutualHint: "Only one extra chart mode can be enabled at a time.",
     autoRefreshTitle: "Auto refresh",
     autoRefreshSub: "Automatically refresh the latest data",
     inDevelopment: "In development",
@@ -361,7 +366,7 @@ const I18N = {
     debugFetchFailed: "Failed to fetch diagnostics",
     footerNote: "Settings are stored locally and applied immediately where the logic is already connected.",
     themeSaved: "Saved",
-    topBlockLimit: "You can select only 2 blocks",
+    topBlockLimit: "You can select up to 4 blocks",
     debugUpdated: "Diagnostics updated",
     debugCopied: "Diagnostics copied",
     debugCopyFailed: "Copy failed",
@@ -580,6 +585,8 @@ function applySettingsLocale() {
   setText("trendLineSub", tr("trendLineSub"));
   setText("splitSiteLinesTitle", tr("splitSiteLinesTitle"));
   setText("splitSiteLinesSub", tr("splitSiteLinesSub"));
+  setText("previousPeriodLineTitle", tr("previousPeriodLineTitle"));
+  setText("previousPeriodLineSub", tr("previousPeriodLineSub"));
   setText("autoRefreshTitle", tr("autoRefreshTitle"));
   setText("autoRefreshSub", tr("autoRefreshSub"));
   setText("debugTitle", tr("debugTitle"));
@@ -601,6 +608,8 @@ function applySettingsLocale() {
   if (trendRow) trendRow.title = tr("toggleMutualHint");
   const splitRow = $("#splitSiteLinesRow");
   if (splitRow) splitRow.title = tr("toggleMutualHint");
+  const previousPeriodRow = $("#previousPeriodLineRow");
+  if (previousPeriodRow) previousPeriodRow.title = tr("toggleMutualHint");
   const autoRow = $("#autoRefreshRow");
   if (autoRow) autoRow.title = tr("inDevelopment");
   const debugLog = $("#debugLog");
@@ -790,11 +799,9 @@ function normalizeSettings(input) {
   const sanitizedTopBlocks = normalized.top_blocks
     .map((item) => String(item || "").trim())
     .filter((item) => item && AVAILABLE_TOP_BLOCKS.has(item))
-    .slice(0, 2);
+    .slice(0, 4);
 
-  normalized.top_blocks = sanitizedTopBlocks.length
-    ? sanitizedTopBlocks
-    : [...DEFAULT_SETTINGS.top_blocks];
+  normalized.top_blocks = sanitizedTopBlocks;
 
   if (
     !sourceTopBlocks ||
@@ -807,7 +814,12 @@ function normalizeSettings(input) {
   normalized.avgLine = !!normalized.avgLine;
   normalized.trendLine = !!normalized.trendLine;
   normalized.splitSiteLines = !!normalized.splitSiteLines;
+  normalized.previousPeriodLine = !!normalized.previousPeriodLine;
   if (normalized.splitSiteLines) {
+    normalized.avgLine = false;
+    normalized.trendLine = false;
+    normalized.previousPeriodLine = false;
+  } else if (normalized.previousPeriodLine) {
     normalized.avgLine = false;
     normalized.trendLine = false;
   } else if (normalized.avgLine && normalized.trendLine) {
@@ -1457,8 +1469,8 @@ function renderTopBlockChoices() {
     ${renderMetricChoice("week_sales", getWeekRevenueTitle(), m.week_sales.amount, m.week_sales.delta, weekNote, m.week_sales.tooltip || "")}
     ${renderMetricChoice("month_sales", getMonthRevenueTitle(), m.month_sales.amount, m.month_sales.delta, monthNote, m.month_sales.tooltip || "")}
     ${renderMetricChoice("year_total", tr("ytdRevenue"), m.year_total.amount, { cls: "neutral", text: `${fmtMoney(m.year_total.avgMonth)} ₽`, hideIcon: true }, tr("avgMonthIncome"))}
-    ${renderTopModelChoice("top30", getTop30Title(), m.top30, getTop30Title())}
     ${renderTopModelChoice("top7", getTop7Title(), m.top7, getTop7Title())}
+    ${renderTopModelChoice("top30", getTop30Title(), m.top30, getTop30Title())}
     ${renderSiteSplitChoice(m.site_split)}
     ${renderNextRankChoice(m.next_rank)}
   `;
@@ -1468,6 +1480,7 @@ function renderTopBlockChoices() {
 function updateToggleState() {
   const avg = $("#avgLineToggle");
   const trend = $("#trendLineToggle");
+  const previousPeriodLine = $("#previousPeriodLineToggle");
   const topBlocksCalendarMode = $("#topBlocksCalendarModeToggle");
   const topBlocksCalendarCompareMode = $("#topBlocksCalendarCompareModeToggle");
   const topBlocksCalendarCompareModeRow = $("#topBlocksCalendarCompareModeRow");
@@ -1476,6 +1489,7 @@ function updateToggleState() {
   if (trend) trend.checked = !!currentSettings.trendLine;
   const splitSiteLines = $("#splitSiteLinesToggle");
   if (splitSiteLines) splitSiteLines.checked = !!currentSettings.splitSiteLines;
+  if (previousPeriodLine) previousPeriodLine.checked = !!currentSettings.previousPeriodLine;
   if (topBlocksCalendarMode) topBlocksCalendarMode.checked = !!currentSettings.topBlocksCalendarMode;
   if (topBlocksCalendarCompareMode) topBlocksCalendarCompareMode.checked = !!currentSettings.topBlocksCalendarCompareFullPeriod;
   if (topBlocksCalendarCompareModeRow) {
@@ -1620,6 +1634,35 @@ function previewValueToY(value, min, span, plot) {
 }
 
 function drawPreviewOverlay(ctx, plot, min, span, points) {
+  if (currentSettings.previousPeriodLine) {
+    const sourceSeries = points.length === PREVIEW_SERIES.length
+      ? PREVIEW_SERIES
+      : Array.from({ length: points.length }, (_, index) => {
+          const start = Math.floor((index / Math.max(1, points.length)) * PREVIEW_SERIES.length);
+          const end = Math.floor(((index + 1) / Math.max(1, points.length)) * PREVIEW_SERIES.length);
+          const slice = PREVIEW_SERIES.slice(start, Math.max(start + 1, end));
+          return slice.reduce((sum, value) => sum + value, 0) / Math.max(1, slice.length);
+        });
+    const previousSeries = sourceSeries.map((value, index) => {
+      const wave = ((index % 5) - 2) * 2.4;
+      const ratio = 0.42 + ((index + 1) % 4) * 0.03;
+      return Math.max(3, Math.min(value, Math.round(value * ratio + wave)));
+    });
+    const previousPoints = previousSeries.map((value, index) => ({
+      x: points[index]?.x ?? plot.left,
+      y: previewValueToY(value, min, span, plot),
+      value
+    }));
+    ctx.save();
+    ctx.strokeStyle = themeColor("--chart-trend-line", "rgba(71,85,105,0.82)");
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    tracePreviewPath(ctx, previousPoints, "smooth");
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   if (currentSettings.avgLine) {
     const avgValue = getPreviewAverage();
     const avgY = previewValueToY(avgValue, min, span, plot);
@@ -1646,6 +1689,7 @@ function drawPreviewOverlay(ctx, plot, min, span, points) {
     ctx.lineTo(points[points.length - 1].x, previewValueToY(trend.last, min, span, plot));
     ctx.stroke();
     ctx.restore();
+    return;
   }
 }
 
@@ -1958,7 +2002,7 @@ function bindChoices() {
         updateTopBlockState();
         return;
       }
-      if (selected.length >= 2) {
+      if (selected.length >= 4) {
         flashSaved(tr("topBlockLimit"));
         updateTopBlockState();
         return;
@@ -1978,7 +2022,7 @@ function bindToggles() {
   $("#avgLineToggle")?.addEventListener("change", async (e) => {
     const checked = !!e.target.checked;
     const patch = checked
-      ? { avgLine: true, trendLine: false, splitSiteLines: false }
+      ? { avgLine: true, trendLine: false, splitSiteLines: false, previousPeriodLine: false }
       : { avgLine: false };
     await persistSettings(patch);
     updateToggleState();
@@ -1988,7 +2032,7 @@ function bindToggles() {
   $("#trendLineToggle")?.addEventListener("change", async (e) => {
     const checked = !!e.target.checked;
     const patch = checked
-      ? { trendLine: true, avgLine: false, splitSiteLines: false }
+      ? { trendLine: true, avgLine: false, splitSiteLines: false, previousPeriodLine: false }
       : { trendLine: false };
     await persistSettings(patch);
     updateToggleState();
@@ -1999,8 +2043,19 @@ function bindToggles() {
     const checked = !!e.target.checked;
     await persistSettings(
       checked
-        ? { splitSiteLines: true, avgLine: false, trendLine: false }
+        ? { splitSiteLines: true, avgLine: false, trendLine: false, previousPeriodLine: false }
         : { splitSiteLines: false }
+    );
+    updateToggleState();
+    renderChartPreviews();
+  });
+
+  $("#previousPeriodLineToggle")?.addEventListener("change", async (e) => {
+    const checked = !!e.target.checked;
+    await persistSettings(
+      checked
+        ? { previousPeriodLine: true, avgLine: false, trendLine: false, splitSiteLines: false }
+        : { previousPeriodLine: false }
     );
     updateToggleState();
     renderChartPreviews();
@@ -2087,10 +2142,11 @@ function buildSafeSettings(settings) {
     avgLine: !!safe.avgLine,
     trendLine: !!safe.trendLine,
     splitSiteLines: !!safe.splitSiteLines,
+    previousPeriodLine: !!safe.previousPeriodLine,
     topBlocksCalendarMode: !!safe.topBlocksCalendarMode,
     topBlocksCalendarCompareFullPeriod: !!safe.topBlocksCalendarCompareFullPeriod,
     autoRefresh: !!safe.autoRefresh,
-    top_blocks: Array.isArray(safe.top_blocks) ? safe.top_blocks.slice(0, 2) : []
+    top_blocks: Array.isArray(safe.top_blocks) ? safe.top_blocks.slice(0, 4) : []
   };
 }
 

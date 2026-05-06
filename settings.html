@@ -34,7 +34,7 @@
     <div class="grid">
       <section class="card full">
         <h2 class="card-title" id="topBlocksTitle">Блоки вверху приложения</h2>
-        <p class="card-sub" id="topBlocksSub">Можно выбрать только 2 блока.</p>
+        <p class="card-sub" id="topBlocksSub">Можно выбрать от 0 до 4 блоков.</p>
         <div class="option-list option-list-compact">
           <div class="toggle-row" id="topBlocksCalendarModeRow">
             <div class="toggle-copy">
@@ -195,6 +195,17 @@
             </div>
             <label class="switch">
               <input type="checkbox" id="splitSiteLinesToggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row" id="previousPeriodLineRow">
+            <div class="toggle-copy">
+              <div class="toggle-title" id="previousPeriodLineTitle">Показывать прошлый период пунктиром</div>
+              <div class="toggle-sub" id="previousPeriodLineSub">Добавляет аккуратную пунктирную линию с продажами за прошлый аналогичный период.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="previousPeriodLineToggle">
               <span class="slider"></span>
             </label>
           </div>
