@@ -14,7 +14,10 @@ const DEFAULT_SETTINGS = {
   top_blocks: ["today", "week_sales"],
   chart_style: "classic",
   avgLine: false,
-  trendLine: false
+  trendLine: false,
+  splitSiteLines: false,
+  topBlocksCalendarMode: false,
+  topBlocksCalendarCompareFullPeriod: false
 };
 const AVAILABLE_TOP_BLOCKS = new Set([
   "today",
@@ -196,23 +199,45 @@ const I18N = {
     authorInfo: "Информация об авторе",
     telegramAria: "Открыть Telegram-канал",
     todayRevenue: "Заработано сегодня",
+    todayRevenueRolling: "Заработано за 24 часа",
     weekRevenue: "Заработано за 7 дней",
+    weekRevenueCalendar: "Заработано за неделю",
     monthRevenue: "Заработано за 30 дней",
+    monthRevenueCalendar: "Заработано за месяц",
     ytdRevenue: "Заработано с начала года",
     topModel30: "Топ модель за 30 дней",
     topModel7: "Топ модель за 7 дней",
     siteSplitTitle: "Продаж за 30 дней",
+    topModel30Calendar: "Топ модель за месяц",
+    topModel7Calendar: "Топ модель за неделю",
+    siteSplitTitleCalendar: "Продаж за месяц",
     nextRankTitle: "Продаж до следующего уровня",
-    previousDay: "За предыдущие сутки",
+    previousDay: "За предыдущие 24 часа",
     previous7d: "За предыдущие 7 дней",
     previous30d: "За предыдущие 30 дней",
+    previousCalendarDay: "За этот же отрезок вчерашнего дня",
+    previousCalendarWeek: "За этот же отрезок прошлой недели",
+    previousCalendarMonth: "За этот же отрезок прошлого месяца",
     previousTop30: "У этой модели за предыдущие 30 дней",
     previousTop7: "У этой модели за предыдущие 7 дней",
+    previousTopCalendarWeek: "У этой модели за этот же отрезок прошлой недели",
+    previousTopCalendarMonth: "У этой модели за этот же отрезок прошлого месяца",
+    previousFullCalendarDay: "За вчерашний день",
+    previousFullCalendarWeek: "За прошлую неделю",
+    previousFullCalendarMonth: "За прошлый месяц",
+    previousTopFullCalendarWeek: "У этой модели за прошлую неделю",
+    previousTopFullCalendarMonth: "У этой модели за прошлый месяц",
     previousPeriodRevenue: "{label}: {amount}",
     previousPeriodSales: "{label}: {count} продаж",
-    vsPrevDay: "к предыдущим суткам",
+    vsPrevDay: "к предыдущим 24 часам",
     vsPrev7d: "к предыдущим 7 дням",
     vsPrev30d: "к предыдущим 30 дням",
+    vsPrevCalendarDay: "к вчерашнему дню",
+    vsPrevCalendarWeek: "к прошлой неделе",
+    vsPrevCalendarMonth: "к прошлому месяцу",
+    vsPrevFullCalendarDay: "к вчерашнему дню",
+    vsPrevFullCalendarWeek: "к прошлой неделе",
+    vsPrevFullCalendarMonth: "к прошлому месяцу",
     avgMonthIncome: "средний доход в месяц",
     monthsCountYtd: "Учтено месяцев с начала года: {count}",
     salesWord: "продаж",
@@ -290,23 +315,45 @@ const I18N = {
     authorInfo: "Author info",
     telegramAria: "Open Telegram channel",
     todayRevenue: "Revenue today",
+    todayRevenueRolling: "Revenue for 24 hours",
     weekRevenue: "Revenue for 7 days",
+    weekRevenueCalendar: "Revenue for a week",
     monthRevenue: "Revenue for 30 days",
+    monthRevenueCalendar: "Revenue for a month",
     ytdRevenue: "Revenue since the start of the year",
     topModel30: "Top model for 30 days",
     topModel7: "Top model for 7 days",
     siteSplitTitle: "Sales for 30 days",
+    topModel30Calendar: "Top model for a month",
+    topModel7Calendar: "Top model for a week",
+    siteSplitTitleCalendar: "Sales for a month",
     nextRankTitle: "Sales to the next rank",
     previousDay: "Previous 24 hours",
     previous7d: "Previous 7 days",
     previous30d: "Previous 30 days",
+    previousCalendarDay: "Same slice of yesterday",
+    previousCalendarWeek: "Same slice of the previous week",
+    previousCalendarMonth: "Same slice of the previous month",
     previousTop30: "This model in the previous 30 days",
     previousTop7: "This model in the previous 7 days",
+    previousTopCalendarWeek: "This model in the same slice of the previous week",
+    previousTopCalendarMonth: "This model in the same slice of the previous month",
+    previousFullCalendarDay: "Yesterday",
+    previousFullCalendarWeek: "Last week",
+    previousFullCalendarMonth: "Last month",
+    previousTopFullCalendarWeek: "This model last week",
+    previousTopFullCalendarMonth: "This model last month",
     previousPeriodRevenue: "{label}: {amount}",
     previousPeriodSales: "{label}: {count} sales",
-    vsPrevDay: "vs previous day",
+    vsPrevDay: "vs previous 24 hours",
     vsPrev7d: "vs previous 7 days",
     vsPrev30d: "vs previous 30 days",
+    vsPrevCalendarDay: "vs yesterday",
+    vsPrevCalendarWeek: "vs last week",
+    vsPrevCalendarMonth: "vs last month",
+    vsPrevFullCalendarDay: "vs yesterday",
+    vsPrevFullCalendarWeek: "vs last week",
+    vsPrevFullCalendarMonth: "vs last month",
     avgMonthIncome: "average income per month",
     monthsCountYtd: "Months counted since the start of the year: {count}",
     salesWord: "sales",
@@ -648,6 +695,15 @@ function sanitizeAppSettings(raw = {}) {
   }
   settings.avgLine = !!settings.avgLine;
   settings.trendLine = !!settings.trendLine;
+  settings.splitSiteLines = !!settings.splitSiteLines;
+  if (settings.splitSiteLines) {
+    settings.avgLine = false;
+    settings.trendLine = false;
+  } else if (settings.avgLine && settings.trendLine) {
+    settings.trendLine = false;
+  }
+  settings.topBlocksCalendarMode = !!settings.topBlocksCalendarMode;
+  settings.topBlocksCalendarCompareFullPeriod = !!settings.topBlocksCalendarCompareFullPeriod;
   return settings;
 }
 
@@ -680,6 +736,13 @@ function rub(n) {
 
 function fmtNumber(n) {
   return new Intl.NumberFormat(getUiLocale()).format(Math.round(Number(n) || 0));
+}
+
+function fmtDecimal(n, digits = 1) {
+  return new Intl.NumberFormat(getUiLocale(), {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  }).format(Number(n) || 0);
 }
 
 function fmtMoney(n) {
@@ -737,6 +800,36 @@ function parseDateUtcPlus3(text) {
   return new Date(utcMs);
 }
 
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function toMskShiftedDate(input) {
+  const base = input instanceof Date ? input.getTime() : new Date(input).getTime();
+  return new Date(base + 3 * 60 * 60 * 1000);
+}
+
+function bucketDayLabel(dUtc) {
+  const msk = toMskShiftedDate(dUtc);
+  const y = msk.getUTCFullYear();
+  const m = String(msk.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(msk.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function bucketMonthLabel(dUtc) {
+  const msk = toMskShiftedDate(dUtc);
+  const y = msk.getUTCFullYear();
+  const m = String(msk.getUTCMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function bucketHourLabel(dUtc) {
+  const msk = toMskShiftedDate(dUtc);
+  const hour = String(msk.getUTCHours()).padStart(2, "0");
+  return `${hour}:00`;
+}
+
 function detectSaleSite(item) {
   const raw = String(item?.regSite || item?.site || "").trim().toLowerCase();
   if (raw.includes("sky")) return "3DSky";
@@ -780,6 +873,154 @@ function getMskDayStartUtcMs(nowMs = Date.now()) {
   ) - offsetMs;
 }
 
+function getMskPeriodStartUtcMs(period, nowMs = Date.now()) {
+  const offsetMs = 3 * 60 * 60 * 1000;
+  const shifted = new Date(nowMs + offsetMs);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const day = shifted.getUTCDate();
+  if (period === "month") {
+    return Date.UTC(year, month, 1, 0, 0, 0, 0) - offsetMs;
+  }
+  if (period === "week") {
+    const weekdayIndex = (shifted.getUTCDay() + 6) % 7;
+    return Date.UTC(year, month, day - weekdayIndex, 0, 0, 0, 0) - offsetMs;
+  }
+  return Date.UTC(year, month, day, 0, 0, 0, 0) - offsetMs;
+}
+
+function getPreviousMskPeriodStartUtcMs(period, currentStartMs) {
+  const offsetMs = 3 * 60 * 60 * 1000;
+  if (period === "week") return currentStartMs - 7 * 24 * 60 * 60 * 1000;
+  const shiftedStart = new Date(currentStartMs + offsetMs);
+  const year = shiftedStart.getUTCFullYear();
+  const month = shiftedStart.getUTCMonth();
+  const day = shiftedStart.getUTCDate();
+  if (period === "month") {
+    return Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - offsetMs;
+  }
+  return Date.UTC(year, month, day - 1, 0, 0, 0, 0) - offsetMs;
+}
+
+function getAnchoredPeriodBounds(period, nowMs = Date.now(), compareFullPeriod = false) {
+  const currentStart = getMskPeriodStartUtcMs(period, nowMs);
+  const previousStart = getPreviousMskPeriodStartUtcMs(period, currentStart);
+  const elapsedMs = Math.max(0, nowMs - currentStart);
+  return {
+    currentStart,
+    currentEnd: nowMs,
+    previousStart,
+    previousEnd: compareFullPeriod ? currentStart : (previousStart + elapsedMs)
+  };
+}
+
+function calculateAnchoredRevenueMetrics(objects, period, compareFullPeriod = false) {
+  const bounds = getAnchoredPeriodBounds(period, Date.now(), compareFullPeriod);
+  let currentSum = 0;
+  let previousSum = 0;
+
+  for (const item of objects || []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    const sum = Number(item?.royaltyAmount || 0);
+    if (time >= bounds.currentStart && time < bounds.currentEnd) currentSum += sum;
+    else if (time >= bounds.previousStart && time < bounds.previousEnd) previousSum += sum;
+  }
+
+  return {
+    currentSum,
+    previousSum,
+    deltaPct: pct(currentSum, previousSum)
+  };
+}
+
+function calculateAnchoredSiteSplitMetrics(objects, period, compareFullPeriod = false) {
+  const bounds = getAnchoredPeriodBounds(period, Date.now(), compareFullPeriod);
+  let currentCount = 0;
+  let previousCount = 0;
+  let site3ddd = 0;
+  let site3dsky = 0;
+
+  for (const item of objects || []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (time >= bounds.currentStart && time < bounds.currentEnd) {
+      currentCount += 1;
+      if (detectSaleSite(item) === "3DSky") site3dsky += 1;
+      else site3ddd += 1;
+    } else if (time >= bounds.previousStart && time < bounds.previousEnd) {
+      previousCount += 1;
+    }
+  }
+
+  return {
+    count: currentCount,
+    previousCount,
+    dddCount: site3ddd,
+    skyCount: site3dsky
+  };
+}
+
+function getSaleModelMetricKey(item) {
+  const slug = String(item?.slug || "").trim();
+  if (slug) return `slug:${slug}`;
+  const titleRu = String(item?.title || "").trim().toLowerCase();
+  const titleEn = String(item?.titleEn || "").trim().toLowerCase();
+  if (titleRu || titleEn) return `title:${titleRu || titleEn}|${titleEn || titleRu}`;
+  return "";
+}
+
+function aggregateModelSales(objects, startMs, endMs) {
+  const map = new Map();
+  for (const item of objects || []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (time < startMs || time >= endMs) continue;
+    const key = getSaleModelMetricKey(item);
+    if (!key) continue;
+    const entry = map.get(key) || {
+      key,
+      slug: String(item?.slug || "").trim(),
+      title: String(item?.title || "").trim(),
+      titleEn: String(item?.titleEn || "").trim(),
+      img: String(item?.img || "").trim(),
+      url: "",
+      count: 0,
+      sum: 0
+    };
+    if (!entry.slug && item?.slug) entry.slug = String(item.slug).trim();
+    if (!entry.title && item?.title) entry.title = String(item.title).trim();
+    if (!entry.titleEn && item?.titleEn) entry.titleEn = String(item.titleEn).trim();
+    if (!entry.img && item?.img) entry.img = String(item.img).trim();
+    entry.count += 1;
+    entry.sum += Number(item?.royaltyAmount || 0);
+    entry.url = entry.slug ? modelUrl(entry.slug) : entry.url;
+    map.set(key, entry);
+  }
+  return map;
+}
+
+function calculateAnchoredTopModelMetric(objects, period, compareFullPeriod = false) {
+  const bounds = getAnchoredPeriodBounds(period, Date.now(), compareFullPeriod);
+  const currentMap = aggregateModelSales(objects, bounds.currentStart, bounds.currentEnd);
+  if (!currentMap.size) return null;
+  const previousMap = aggregateModelSales(objects, bounds.previousStart, bounds.previousEnd);
+  const best = Array.from(currentMap.values()).sort((a, b) => {
+    if (b.sum !== a.sum) return b.sum - a.sum;
+    if (b.count !== a.count) return b.count - a.count;
+    return String(a.title || "").localeCompare(String(b.title || ""));
+  })[0];
+  const previous = previousMap.get(best.key);
+  return {
+    ...best,
+    previousSum: Number(previous?.sum || 0),
+    deltaPct: pct(best.sum, Number(previous?.sum || 0))
+  };
+}
+
 function calculateTodayRevenueMetrics(objects) {
   const nowMs = Date.now();
   const todayStart = getMskDayStartUtcMs(nowMs);
@@ -809,6 +1050,30 @@ function formatPreviousRevenueTooltip(label, amount) {
 
 function formatPreviousSalesTooltip(label, count) {
   return tr("previousPeriodSales", { label, count: fmtNumber(count) });
+}
+
+function getTodayRevenueTitle() {
+  return currentAppSettings?.topBlocksCalendarMode ? tr("todayRevenue") : tr("todayRevenueRolling");
+}
+
+function getWeekRevenueTitle() {
+  return currentAppSettings?.topBlocksCalendarMode ? tr("weekRevenueCalendar") : tr("weekRevenue");
+}
+
+function getMonthRevenueTitle() {
+  return currentAppSettings?.topBlocksCalendarMode ? tr("monthRevenueCalendar") : tr("monthRevenue");
+}
+
+function getTop7Title() {
+  return currentAppSettings?.topBlocksCalendarMode ? tr("topModel7Calendar") : tr("topModel7");
+}
+
+function getTop30Title() {
+  return currentAppSettings?.topBlocksCalendarMode ? tr("topModel30Calendar") : tr("topModel30");
+}
+
+function getSiteSplitTitle() {
+  return currentAppSettings?.topBlocksCalendarMode ? tr("siteSplitTitleCalendar") : tr("siteSplitTitle");
 }
 
 function getModelFrontendBaseUrl() {
@@ -1029,7 +1294,7 @@ function siteSplitCardHtml(siteSplit) {
   const skyLabel = currentLanguage === "en" ? "3DSky" : "3DSky";
   return `
     <div class="card metric-card site-split-card">
-      <div class="metric-title">${tr("siteSplitTitle")}</div>
+      <div class="metric-title">${getSiteSplitTitle()}</div>
       <div class="site-split-layout">
         <div class="site-split-left">
           <div class="site-split-value">${fmtNumber(siteSplit?.count || 0)}</div>
@@ -1255,8 +1520,8 @@ function renderTopBlockByKey(key, metrics) {
       tooltip: metrics.year_total.tooltip
     });
   }
-  if (key === "top30") return topModelCardHtml(tr("topModel30"), metrics.top30);
-  if (key === "top7") return topModelCardHtml(tr("topModel7"), metrics.top7);
+  if (key === "top30") return topModelCardHtml(getTop30Title(), metrics.top30);
+  if (key === "top7") return topModelCardHtml(getTop7Title(), metrics.top7);
   if (key === "site_split") return siteSplitCardHtml(metrics.site_split);
   if (key === "next_rank") return nextRankCardHtml(metrics.next_rank);
   return renderMetricTopBlock(metrics.today);
@@ -1266,48 +1531,67 @@ function buildTopBlockMetrics(data) {
   const { objects, cards, top, stats, overviewLabels, overviewValues } = getTopBlockSources(data);
   const yearAndSite = calculateYearAndSiteMetrics(objects, overviewLabels, overviewValues);
   const rankMetric = calculateRankMetric(stats?.totalSalesAll);
-  const todayFallback = calculateTodayRevenueMetrics(objects);
-  const weekFallback = calculateRollingRevenueMetrics(objects, 7);
-  const monthFallback = calculateRollingRevenueMetrics(objects, 30);
-  const top30 = top?.["30d"]?.[0] || null;
-  const top7 = top?.["7d"]?.[0] || null;
+  const topBlocksCalendarMode = !!currentAppSettings.topBlocksCalendarMode;
+  const compareFullCalendarPeriod = !!currentAppSettings.topBlocksCalendarCompareFullPeriod;
+  const hasObjects = objects.length > 0;
+  const canUseCalendarObjects = topBlocksCalendarMode && objects.length > 0;
+  const todayFallback = topBlocksCalendarMode ? calculateAnchoredRevenueMetrics(objects, "day", compareFullCalendarPeriod) : calculateRollingRevenueMetrics(objects, 1);
+  const weekFallback = canUseCalendarObjects ? calculateAnchoredRevenueMetrics(objects, "week", compareFullCalendarPeriod) : calculateRollingRevenueMetrics(objects, 7);
+  const monthFallback = canUseCalendarObjects ? calculateAnchoredRevenueMetrics(objects, "month", compareFullCalendarPeriod) : calculateRollingRevenueMetrics(objects, 30);
+  const siteSplitFallback = canUseCalendarObjects ? calculateAnchoredSiteSplitMetrics(objects, "month", compareFullCalendarPeriod) : null;
+  const top30 = canUseCalendarObjects ? (calculateAnchoredTopModelMetric(objects, "month", compareFullCalendarPeriod) || top?.["30d"]?.[0] || null) : (top?.["30d"]?.[0] || null);
+  const top7 = canUseCalendarObjects ? (calculateAnchoredTopModelMetric(objects, "week", compareFullCalendarPeriod) || top?.["7d"]?.[0] || null) : (top?.["7d"]?.[0] || null);
+  const dayNote = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "vsPrevFullCalendarDay" : "vsPrevCalendarDay") : tr("vsPrevDay");
+  const weekNote = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "vsPrevFullCalendarWeek" : "vsPrevCalendarWeek") : tr("vsPrev7d");
+  const monthNote = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "vsPrevFullCalendarMonth" : "vsPrevCalendarMonth") : tr("vsPrev30d");
+  const dayTooltipLabel = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "previousFullCalendarDay" : "previousCalendarDay") : tr("previousDay");
+  const weekTooltipLabel = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "previousFullCalendarWeek" : "previousCalendarWeek") : tr("previous7d");
+  const monthTooltipLabel = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "previousFullCalendarMonth" : "previousCalendarMonth") : tr("previous30d");
+  const top7TooltipLabel = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "previousTopFullCalendarWeek" : "previousTopCalendarWeek") : tr("previousTop7");
+  const top30TooltipLabel = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "previousTopFullCalendarMonth" : "previousTopCalendarMonth") : tr("previousTop30");
+  const siteSplitCount = canUseCalendarObjects ? siteSplitFallback.count : yearAndSite.monthSalesCount;
+  const siteSplitPrevCount = canUseCalendarObjects ? siteSplitFallback.previousCount : yearAndSite.prevMonthSalesCount;
+  const siteSplitDddCount = canUseCalendarObjects ? siteSplitFallback.dddCount : yearAndSite.site3ddd;
+  const siteSplitSkyCount = canUseCalendarObjects ? siteSplitFallback.skyCount : yearAndSite.site3dsky;
+  const siteSplitTotal = Math.max(1, siteSplitDddCount + siteSplitSkyCount);
+  const siteSplitDddPct = Math.round((siteSplitDddCount / siteSplitTotal) * 100);
 
   return {
     today: {
-      amount: Number(cards?.today?.sum || 0),
-      delta: fmtPct(Number(cards?.today?.deltaPct || 0)),
-      note: tr("vsPrevDay"),
-      title: tr("todayRevenue"),
-      tooltip: formatPreviousRevenueTooltip(tr("previousDay"), todayFallback.previousSum)
+      amount: Number(hasObjects ? todayFallback.currentSum : (cards?.today?.sum || 0)),
+      delta: fmtPct(Number(hasObjects ? todayFallback.deltaPct : (cards?.today?.deltaPct || 0))),
+      note: dayNote,
+      title: getTodayRevenueTitle(),
+      tooltip: formatPreviousRevenueTooltip(dayTooltipLabel, todayFallback.previousSum)
     },
     week_sales: {
-      amount: Number(cards?.week?.sum || 0),
-      delta: fmtPct(Number(cards?.week?.deltaPct || 0)),
-      note: tr("vsPrev7d"),
-      title: tr("weekRevenue"),
-      tooltip: formatPreviousRevenueTooltip(tr("previous7d"), weekFallback.previousSum)
+      amount: Number(canUseCalendarObjects ? weekFallback.currentSum : (cards?.week?.sum || 0)),
+      delta: fmtPct(Number(canUseCalendarObjects ? weekFallback.deltaPct : (cards?.week?.deltaPct || 0))),
+      note: weekNote,
+      title: getWeekRevenueTitle(),
+      tooltip: formatPreviousRevenueTooltip(weekTooltipLabel, weekFallback.previousSum)
     },
     month_sales: {
-      amount: Number((cards?.month?.sum ?? monthFallback.currentSum ?? stats?.scales?.["30d"]?.sum) || 0),
-      delta: fmtPct(Number((cards?.month?.deltaPct ?? monthFallback.deltaPct) || 0)),
-      note: tr("vsPrev30d"),
-      title: tr("monthRevenue"),
-      tooltip: formatPreviousRevenueTooltip(tr("previous30d"), monthFallback.previousSum)
+      amount: Number((canUseCalendarObjects ? monthFallback.currentSum : (cards?.month?.sum ?? monthFallback.currentSum ?? stats?.scales?.["30d"]?.sum)) || 0),
+      delta: fmtPct(Number((canUseCalendarObjects ? monthFallback.deltaPct : (cards?.month?.deltaPct ?? monthFallback.deltaPct)) || 0)),
+      note: monthNote,
+      title: getMonthRevenueTitle(),
+      tooltip: formatPreviousRevenueTooltip(monthTooltipLabel, monthFallback.previousSum)
     },
     site_split: {
-      count: yearAndSite.monthSalesCount,
-      delta: fmtPct(pct(yearAndSite.monthSalesCount, yearAndSite.prevMonthSalesCount)),
-      dddCount: yearAndSite.site3ddd,
-      skyCount: yearAndSite.site3dsky,
-      dddPct: yearAndSite.site3dddPct,
-      skyPct: yearAndSite.site3dskyPct,
-      tooltip: formatPreviousSalesTooltip(tr("previous30d"), yearAndSite.prevMonthSalesCount)
+      count: siteSplitCount,
+      delta: fmtPct(pct(siteSplitCount, siteSplitPrevCount)),
+      dddCount: siteSplitDddCount,
+      skyCount: siteSplitSkyCount,
+      dddPct: siteSplitDddPct,
+      skyPct: 100 - siteSplitDddPct,
+      tooltip: formatPreviousSalesTooltip(monthTooltipLabel, siteSplitPrevCount)
     },
     top30: top30 ? Object.assign({}, top30, {
-      tooltip: formatPreviousRevenueTooltip(tr("previousTop30"), calculateTopModelPreviousRevenue(objects, top30, 30))
+      tooltip: formatPreviousRevenueTooltip(top30TooltipLabel, canUseCalendarObjects ? Number(top30.previousSum || 0) : calculateTopModelPreviousRevenue(objects, top30, 30))
     }) : null,
     top7: top7 ? Object.assign({}, top7, {
-      tooltip: formatPreviousRevenueTooltip(tr("previousTop7"), calculateTopModelPreviousRevenue(objects, top7, 7))
+      tooltip: formatPreviousRevenueTooltip(top7TooltipLabel, canUseCalendarObjects ? Number(top7.previousSum || 0) : calculateTopModelPreviousRevenue(objects, top7, 7))
     }) : null,
     year_total: {
       amount: yearAndSite.ytdSum,
@@ -1699,9 +1983,14 @@ function drawLineChart(canvas, labels, values, options = {}) {
   const innerH = h - padT - padB;
   if (!values.length) return { points: [], padL, padR, padT, padB, innerW, innerH, labels, values };
   const style = AVAILABLE_CHART_STYLES.has(options.style) ? options.style : "classic";
-
-  const rawMax = Math.max(...values);
-  const rawMin = Math.min(...values);
+  const splitSeries = options?.splitSeries && Array.isArray(options.splitSeries.dddValues) && Array.isArray(options.splitSeries.skyValues)
+    ? options.splitSeries
+    : null;
+  const allSeriesValues = splitSeries
+    ? (splitSeries.dddValues || []).concat(splitSeries.skyValues || [])
+    : values;
+  const rawMax = Math.max(...allSeriesValues);
+  const rawMin = Math.min(...allSeriesValues);
   let maxV = rawMax;
   let minV = Math.max(0, rawMin);
   if (rawMax === rawMin) {
@@ -1744,61 +2033,175 @@ function drawLineChart(canvas, labels, values, options = {}) {
     : -1;
   let averageValue = Number.isFinite(options.avgValue) ? Number(options.avgValue) : null;
   let averageY = null;
+  let splitPoints = null;
 
   if (style === "bar") {
     const gap = Math.max(2, Math.min(8, barSlotWidth * 0.22));
     const barWidth = Math.max(3, Math.min(24, barSlotWidth - gap));
-    values.forEach((value, index) => {
-      const barHeight = ((value - minV) / range) * innerH;
-      const x = padL + index * barSlotWidth + (barSlotWidth - barWidth) / 2;
-      const y = padT + innerH - barHeight;
-      const isSelected = index === selectedIndex;
-      ctx.fillStyle = isSelected
-        ? themeColor("--chart-line", "#2f2f2f")
-        : themeColor("--mini-bar", "#d1d5db");
-      ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, Math.max(2, barHeight), Math.min(8, barWidth / 2));
-      ctx.fill();
-    });
-  } else {
-    ctx.save();
-    const fill = ctx.createLinearGradient(0, padT, 0, padT + innerH);
-    fill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.16)"));
-    fill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.02)"));
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, padT + innerH);
-    ctx.lineTo(points[0].x, points[0].y);
-    traceSeriesPathFromSecond(ctx, points, style);
-    ctx.lineTo(points[points.length - 1].x, padT + innerH);
-    ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
-    ctx.restore();
+    if (splitSeries) {
+      const dddPoints = [];
+      const skyPoints = [];
+      values.forEach((value, index) => {
+        const x = padL + index * barSlotWidth + (barSlotWidth - barWidth) / 2;
+        const dddValue = Number(splitSeries.dddValues?.[index] || 0);
+        const skyValue = Number(splitSeries.skyValues?.[index] || 0);
+        const dddHeight = ((dddValue - minV) / range) * innerH;
+        const skyHeight = ((skyValue - minV) / range) * innerH;
+        const dddY = padT + innerH - dddHeight;
+        const skyY = padT + innerH - skyHeight;
+        dddPoints.push({ x: x + barWidth / 2, y: dddY });
+        skyPoints.push({ x: x + barWidth / 2, y: skyY });
+        const bars = [
+          {
+            key: "ddd",
+            value: dddValue,
+            height: dddHeight,
+            y: dddY,
+            baseColor: themeColor("--mini-bar", "#d1d5db"),
+            selectedColor: themeColor("--chart-line", "#2f2f2f")
+          },
+          {
+            key: "sky",
+            value: skyValue,
+            height: skyHeight,
+            y: skyY,
+            baseColor: themeColor("--chart-sky-line-soft", "rgba(56, 189, 248, 0.42)"),
+            selectedColor: themeColor("--chart-sky-line", "#38bdf8")
+          }
+        ].sort((a, b) => b.value - a.value);
 
-    ctx.strokeStyle = themeColor("--chart-line", "#2f2f2f");
-    ctx.lineWidth = style === "smooth" ? 2.8 : 2.2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    traceSeriesPath(ctx, points, style);
-    ctx.stroke();
-
-    if (style === "classic" || style === "smooth") {
-      const last = points[points.length - 1];
-      ctx.fillStyle = themeColor("--chart-point", "#111");
-      ctx.beginPath();
-      ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
-      ctx.fill();
+        bars.forEach((bar, drawIndex) => {
+          const isSelected = index === selectedIndex;
+          ctx.save();
+          ctx.globalAlpha = isSelected ? 0.96 : 0.82;
+          ctx.fillStyle = isSelected ? bar.selectedColor : bar.baseColor;
+          ctx.beginPath();
+          ctx.roundRect(x, bar.y, barWidth, Math.max(2, bar.height), Math.min(8, barWidth / 2));
+          ctx.fill();
+          ctx.restore();
+        });
+      });
+      splitPoints = { dddPoints, skyPoints };
     } else {
-      points.forEach((point, index) => {
-        const radius = index === selectedIndex ? 4.5 : 2.8;
-        ctx.fillStyle = index === selectedIndex
-          ? themeColor("--chart-line", "#111")
-          : themeColor("--chart-point-soft", themeColor("--mini-bar", "#9ca3af"));
+      values.forEach((value, index) => {
+        const barHeight = ((value - minV) / range) * innerH;
+        const x = padL + index * barSlotWidth + (barSlotWidth - barWidth) / 2;
+        const y = padT + innerH - barHeight;
+        const isSelected = index === selectedIndex;
+        ctx.fillStyle = isSelected
+          ? themeColor("--chart-line", "#2f2f2f")
+          : themeColor("--mini-bar", "#d1d5db");
         ctx.beginPath();
-        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        ctx.roundRect(x, y, barWidth, Math.max(2, barHeight), Math.min(8, barWidth / 2));
         ctx.fill();
       });
+    }
+  } else {
+    ctx.save();
+    if (!splitSeries) {
+      const fill = ctx.createLinearGradient(0, padT, 0, padT + innerH);
+      fill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.16)"));
+      fill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.02)"));
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, padT + innerH);
+      ctx.lineTo(points[0].x, points[0].y);
+      traceSeriesPathFromSecond(ctx, points, style);
+      ctx.lineTo(points[points.length - 1].x, padT + innerH);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    if (splitSeries) {
+      const dddPoints = splitSeries.dddValues.map((value, index) => ({
+        x: points[index].x,
+        y: valueToChartY(Number(value || 0), minV, range, padT, innerH)
+      }));
+      const skyPoints = splitSeries.skyValues.map((value, index) => ({
+        x: points[index].x,
+        y: valueToChartY(Number(value || 0), minV, range, padT, innerH)
+      }));
+      splitPoints = { dddPoints, skyPoints };
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(dddPoints[0].x, padT + innerH);
+      ctx.lineTo(dddPoints[0].x, dddPoints[0].y);
+      traceSeriesPathFromSecond(ctx, dddPoints, style);
+      ctx.lineTo(dddPoints[dddPoints.length - 1].x, padT + innerH);
+      ctx.closePath();
+      const dddFill = ctx.createLinearGradient(0, padT, 0, padT + innerH);
+      dddFill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.14)"));
+      dddFill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.02)"));
+      ctx.fillStyle = dddFill;
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(skyPoints[0].x, padT + innerH);
+      ctx.lineTo(skyPoints[0].x, skyPoints[0].y);
+      traceSeriesPathFromSecond(ctx, skyPoints, style);
+      ctx.lineTo(skyPoints[skyPoints.length - 1].x, padT + innerH);
+      ctx.closePath();
+      const skyFill = ctx.createLinearGradient(0, padT, 0, padT + innerH);
+      skyFill.addColorStop(0, themeColor("--chart-sky-fill-start", "rgba(56, 189, 248, 0.14)"));
+      skyFill.addColorStop(1, themeColor("--chart-sky-fill-end", "rgba(56, 189, 248, 0.02)"));
+      ctx.fillStyle = skyFill;
+      ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = themeColor("--chart-line", "#2f2f2f");
+      ctx.lineWidth = style === "smooth" ? 2.8 : 2.2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      traceSeriesPath(ctx, dddPoints, style);
+      ctx.stroke();
+
+      ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+      ctx.lineWidth = style === "smooth" ? 2.5 : 2;
+      ctx.beginPath();
+      traceSeriesPath(ctx, skyPoints, style);
+      ctx.stroke();
+
+      const lastDdd = dddPoints[dddPoints.length - 1];
+      const lastSky = skyPoints[skyPoints.length - 1];
+      ctx.fillStyle = themeColor("--chart-point", "#111");
+      ctx.beginPath();
+      ctx.arc(lastDdd.x, lastDdd.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = themeColor("--chart-sky-line", "#38bdf8");
+      ctx.beginPath();
+      ctx.arc(lastSky.x, lastSky.y, 3.3, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = themeColor("--chart-line", "#2f2f2f");
+      ctx.lineWidth = style === "smooth" ? 2.8 : 2.2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      traceSeriesPath(ctx, points, style);
+      ctx.stroke();
+
+      if (style === "classic" || style === "smooth") {
+        const last = points[points.length - 1];
+        ctx.fillStyle = themeColor("--chart-point", "#111");
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        points.forEach((point, index) => {
+          const radius = index === selectedIndex ? 4.5 : 2.8;
+          ctx.fillStyle = index === selectedIndex
+            ? themeColor("--chart-line", "#111")
+            : themeColor("--chart-point-soft", themeColor("--mini-bar", "#9ca3af"));
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
     }
   }
 
@@ -1844,7 +2247,29 @@ function drawLineChart(canvas, labels, values, options = {}) {
     ctx.lineTo(selected.x, padT + innerH);
     ctx.stroke();
 
-    if (style !== "bar") {
+    if (splitPoints?.dddPoints?.[selectedIndex] && splitPoints?.skyPoints?.[selectedIndex]) {
+      const selectedDdd = splitPoints.dddPoints[selectedIndex];
+      const selectedSky = splitPoints.skyPoints[selectedIndex];
+      ctx.fillStyle = themeColor("--chart-select-fill", "#ffffff");
+      ctx.beginPath();
+      ctx.arc(selectedDdd.x, selectedDdd.y, 5.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = themeColor("--chart-select-stroke", "#2f2f2f");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(selectedDdd.x, selectedDdd.y, 4.2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = themeColor("--chart-select-fill", "#ffffff");
+      ctx.beginPath();
+      ctx.arc(selectedSky.x, selectedSky.y, 5.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(selectedSky.x, selectedSky.y, 4, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (style !== "bar") {
       ctx.fillStyle = themeColor("--chart-select-fill", "#ffffff");
       ctx.beginPath();
       ctx.arc(selected.x, selected.y, 6, 0, Math.PI * 2);
@@ -1870,7 +2295,23 @@ function drawLineChart(canvas, labels, values, options = {}) {
     ctx.fillText(txt, Math.max(padL, Math.min(padL + innerW - width, x - width / 2)), h - 20);
   }
 
-  return { points, padL, padR, padT, padB, innerW, innerH, labels, values, style, averageValue, averageY };
+  return {
+    points,
+    splitPoints,
+    padL,
+    padR,
+    padT,
+    padB,
+    innerW,
+    innerH,
+    labels,
+    values,
+    style,
+    averageValue,
+    averageY,
+    splitSeries,
+    splitCountSeries: options?.splitCountSeries || null
+  };
 }
 
 function drawMiniChart(canvas, values, windowStart, windowEnd) {
@@ -1958,8 +2399,13 @@ function syncAverageChartTooltip(tooltip, dateEl, sumEl, renderState) {
   }
   const wrap = $("#chartWrapInner");
   const avgUnit = renderState.avgMode === "month" ? tr("averagePerMonth") : tr("averagePerDay");
+  const avgCount = Array.isArray(renderState.counts) && renderState.counts.length
+    ? getAverageValue(renderState.counts)
+    : null;
   dateEl.textContent = tr("averageLine");
-  sumEl.innerHTML = `<b>${rub(renderState.averageValue)}</b> ${avgUnit}`;
+  sumEl.innerHTML = avgCount != null
+    ? `<b>${rub(renderState.averageValue)} (${fmtDecimal(avgCount)})</b> ${avgUnit}`
+    : `<b>${rub(renderState.averageValue)}</b> ${avgUnit}`;
   tooltip.classList.add("visible");
   tooltip.classList.add("chart-tooltip-avg");
   const maxLeft = Math.max(0, (wrap?.clientWidth || 0) - tooltip.offsetWidth - 8);
@@ -1973,13 +2419,26 @@ function syncSelectedPointTooltip(tooltip, dateEl, sumEl, renderState) {
   const point = renderState.points?.[chartSelection.index];
   const label = renderState.labels?.[chartSelection.index];
   const value = renderState.values?.[chartSelection.index];
+  const count = Math.max(0, Math.round(Number(renderState.counts?.[chartSelection.index] || 0)));
   if (!point || label == null || value == null) {
     hideChartTooltip();
     return;
   }
 
   dateEl.textContent = formatTooltipDate(label, renderState.mode);
-  sumEl.innerHTML = tr("chartSalesValue", { value: rub(value) });
+  if (renderState.splitSeries) {
+    const dddValue = Number(renderState.splitSeries.dddValues?.[chartSelection.index] || 0);
+    const skyValue = Number(renderState.splitSeries.skyValues?.[chartSelection.index] || 0);
+    const dddCount = Math.max(0, Math.round(Number(renderState.splitCountSeries?.dddCounts?.[chartSelection.index] || 0)));
+    const skyCount = Math.max(0, Math.round(Number(renderState.splitCountSeries?.skyCounts?.[chartSelection.index] || 0)));
+    sumEl.innerHTML = [
+      `<b>${rub(value)} (${fmtNumber(count)})</b>`,
+      `<span>3DDD: ${rub(dddValue)} (${fmtNumber(dddCount)})</span>`,
+      `<span>3DSky: ${rub(skyValue)} (${fmtNumber(skyCount)})</span>`
+    ].join("<br>");
+  } else {
+    sumEl.innerHTML = tr("chartSalesValue", { value: `${rub(value)} (${fmtNumber(count)})` });
+  }
 
   const wrap = $("#chartWrapInner");
   tooltip.classList.remove("chart-tooltip-avg");
@@ -1988,7 +2447,13 @@ function syncSelectedPointTooltip(tooltip, dateEl, sumEl, renderState) {
   let left = point.x + 12;
   if (wrap && left > maxLeft) left = point.x - tooltip.offsetWidth - 12;
   left = Math.max(8, Math.min(maxLeft, left));
-  const top = Math.max(8, Math.min(point.y - 16, (wrap?.clientHeight || 0) - tooltip.offsetHeight - 8));
+  const anchorY = renderState.splitPoints?.dddPoints?.[chartSelection.index] && renderState.splitPoints?.skyPoints?.[chartSelection.index]
+    ? Math.min(
+        renderState.splitPoints.dddPoints[chartSelection.index].y,
+        renderState.splitPoints.skyPoints[chartSelection.index].y
+      )
+    : point.y;
+  const top = Math.max(8, Math.min(anchorY - 16, (wrap?.clientHeight || 0) - tooltip.offsetHeight - 8));
 
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${top}px`;
@@ -2107,6 +2572,141 @@ function getAdaptiveChartSeries(data, scale, overviewSeries) {
   };
 }
 
+function getSplitLineTimeBounds(scale) {
+  const nowMs = Date.now();
+  if (scale === "24h") return { start: nowMs - (24 * 60 * 60 * 1000), end: nowMs };
+  if (scale === "7d") return { start: nowMs - (7 * 24 * 60 * 60 * 1000), end: nowMs };
+  if (scale === "30d") return { start: nowMs - (30 * 24 * 60 * 60 * 1000), end: nowMs };
+  return null;
+}
+
+function getSplitLineBucketLabel(date, scale, mode) {
+  if (scale === "24h") return bucketHourLabel(date);
+  if (scale === "all" && mode === "month") return `${bucketMonthLabel(date)}-01`;
+  return bucketDayLabel(date);
+}
+
+function buildSplitLineSeries(scale, adaptiveSeries, renderSeries) {
+  if (!currentAppSettings.splitSiteLines || !Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
+    return null;
+  }
+  const sourceLabels = Array.isArray(adaptiveSeries?.labels) ? adaptiveSeries.labels : [];
+  const labels = Array.isArray(renderSeries?.labels) ? renderSeries.labels : sourceLabels;
+  if (!sourceLabels.length || !labels.length) return null;
+  const labelSet = new Set(sourceLabels);
+  const dddMap = new Map();
+  const skyMap = new Map();
+  const bounds = getSplitLineTimeBounds(scale);
+
+  for (const item of cachedSalesObjects) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (bounds && (time < bounds.start || time >= bounds.end)) continue;
+    const label = getSplitLineBucketLabel(dt, scale, renderSeries?.mode || adaptiveSeries?.mode || "plain");
+    if (!labelSet.has(label)) continue;
+    const amount = Number(item?.royaltyAmount || 0);
+    if (!Number.isFinite(amount) || amount === 0) continue;
+    const target = detectSaleSite(item) === "3DSky" ? skyMap : dddMap;
+    target.set(label, (target.get(label) || 0) + amount);
+  }
+
+  let dddValues = sourceLabels.map((label) => roundMoney(dddMap.get(label) || 0));
+  let skyValues = sourceLabels.map((label) => roundMoney(skyMap.get(label) || 0));
+
+  if (labels.length !== sourceLabels.length) {
+    const groupSize = Math.max(1, Math.round(sourceLabels.length / labels.length));
+    dddValues = aggregateBarSeries(sourceLabels, dddValues, renderSeries?.mode || adaptiveSeries?.mode || "plain", groupSize).values;
+    skyValues = aggregateBarSeries(sourceLabels, skyValues, renderSeries?.mode || adaptiveSeries?.mode || "plain", groupSize).values;
+  }
+
+  return {
+    dddValues,
+    skyValues
+  };
+}
+
+function buildSplitCountSeries(scale, adaptiveSeries, renderSeries) {
+  if (!currentAppSettings.splitSiteLines || !Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
+    return null;
+  }
+  const sourceLabels = Array.isArray(adaptiveSeries?.labels) ? adaptiveSeries.labels : [];
+  const labels = Array.isArray(renderSeries?.labels) ? renderSeries.labels : sourceLabels;
+  if (!sourceLabels.length || !labels.length) return null;
+  const labelSet = new Set(sourceLabels);
+  const dddMap = new Map();
+  const skyMap = new Map();
+  const bounds = getSplitLineTimeBounds(scale);
+
+  for (const item of cachedSalesObjects) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (bounds && (time < bounds.start || time >= bounds.end)) continue;
+    const label = getSplitLineBucketLabel(dt, scale, renderSeries?.mode || adaptiveSeries?.mode || "plain");
+    if (!labelSet.has(label)) continue;
+    const target = detectSaleSite(item) === "3DSky" ? skyMap : dddMap;
+    target.set(label, (target.get(label) || 0) + 1);
+  }
+
+  let dddCounts = sourceLabels.map((label) => Math.round(Number(dddMap.get(label) || 0)));
+  let skyCounts = sourceLabels.map((label) => Math.round(Number(skyMap.get(label) || 0)));
+  if (labels.length !== sourceLabels.length) {
+    const groupSize = Math.max(1, Math.ceil(sourceLabels.length / labels.length));
+    dddCounts = aggregateBarSeries(
+      sourceLabels,
+      dddCounts,
+      renderSeries?.mode || adaptiveSeries?.mode || "plain",
+      groupSize
+    ).values.map((value) => Math.round(Number(value || 0)));
+    skyCounts = aggregateBarSeries(
+      sourceLabels,
+      skyCounts,
+      renderSeries?.mode || adaptiveSeries?.mode || "plain",
+      groupSize
+    ).values.map((value) => Math.round(Number(value || 0)));
+  }
+
+  return {
+    dddCounts,
+    skyCounts
+  };
+}
+
+function buildChartCountSeries(scale, adaptiveSeries, renderSeries) {
+  if (!Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
+    return Array.isArray(renderSeries?.labels) ? renderSeries.labels.map(() => 0) : [];
+  }
+  const sourceLabels = Array.isArray(adaptiveSeries?.labels) ? adaptiveSeries.labels : [];
+  const labels = Array.isArray(renderSeries?.labels) ? renderSeries.labels : sourceLabels;
+  if (!sourceLabels.length || !labels.length) return [];
+  const labelSet = new Set(sourceLabels);
+  const countMap = new Map();
+  const bounds = getSplitLineTimeBounds(scale);
+
+  for (const item of cachedSalesObjects) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (bounds && (time < bounds.start || time >= bounds.end)) continue;
+    const label = getSplitLineBucketLabel(dt, scale, renderSeries?.mode || adaptiveSeries?.mode || "plain");
+    if (!labelSet.has(label)) continue;
+    countMap.set(label, (countMap.get(label) || 0) + 1);
+  }
+
+  let counts = sourceLabels.map((label) => Math.round(Number(countMap.get(label) || 0)));
+  if (labels.length !== sourceLabels.length) {
+    const groupSize = Math.max(1, Math.ceil(sourceLabels.length / labels.length));
+    counts = aggregateBarSeries(
+      sourceLabels,
+      counts,
+      renderSeries?.mode || adaptiveSeries?.mode || "plain",
+      groupSize
+    ).values.map((value) => Math.round(Number(value || 0)));
+  }
+  return counts;
+}
+
 function getChartRenderSeries(scale, chartStyle, adaptiveSeries) {
   if (chartStyle === "bar" && scale === "all") {
     return aggregateBarSeries(
@@ -2127,6 +2727,9 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
   const xTicks = buildXAxisTicks(renderSeries.labels, scale, renderSeries.mode);
   const selectedIndex = getChartSelectedIndex(scale);
   const avgValue = currentAppSettings.avgLine ? getAverageValue(adaptiveSeries.values) : null;
+  const splitSeries = buildSplitLineSeries(scale, adaptiveSeries, renderSeries);
+  const splitCountSeries = buildSplitCountSeries(scale, adaptiveSeries, renderSeries);
+  const countSeries = buildChartCountSeries(scale, adaptiveSeries, renderSeries);
   const renderState = drawLineChart($("#chart"), renderSeries.labels, renderSeries.values, {
     scale,
     mode: renderSeries.mode,
@@ -2134,14 +2737,18 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
     avgValue,
     xTicks,
     selectedIndex,
-    style: chartStyle
+    style: chartStyle,
+    splitSeries
   });
   return Object.assign({}, renderState, {
     mode: renderSeries.mode,
     avgMode: adaptiveSeries.mode,
     scale,
     labels: renderSeries.labels,
-    values: renderSeries.values
+    values: renderSeries.values,
+    counts: countSeries,
+    splitSeries,
+    splitCountSeries
   });
 }
 

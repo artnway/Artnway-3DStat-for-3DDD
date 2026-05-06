@@ -5,6 +5,7 @@ const UI_LANGUAGE_KEY = "uiLanguage";
 const WITHDRAW_CACHE_INDEX_KEY = "cachedWithdrawStatIndex";
 const WITHDRAW_CACHE_LEGACY_KEY = "cachedWithdrawStatById";
 const WITHDRAW_CACHE_PREFIX = "cachedWithdrawStat:";
+const DONATE_URL = "https://pay.cloudtips.ru/p/c37b73ce";
 const DEFAULT_SETTINGS = {
   theme: "ddd-light",
   themeVersion: 2,
@@ -12,6 +13,9 @@ const DEFAULT_SETTINGS = {
   chart_style: "classic",
   avgLine: false,
   trendLine: false,
+  splitSiteLines: false,
+  topBlocksCalendarMode: false,
+  topBlocksCalendarCompareFullPeriod: false,
   autoRefresh: false
 };
 const AVAILABLE_TOP_BLOCKS = new Set([
@@ -48,6 +52,7 @@ let cachedSalesObjects = [];
 let currentLanguage = "ru";
 let currentFrontendBaseUrl = "https://3ddd.ru";
 let currentLanguageMode = "auto";
+let choicesBound = false;
 
 function isPromiseLike(value) {
   return !!value && typeof value.then === "function";
@@ -111,8 +116,14 @@ const I18N = {
     pageTitle: "3DStat — Настройки",
     heroTitle: "Настройки приложения",
     heroSub: "Здесь собраны визуальные и диагностические настройки приложения: темы, верхние блоки, стиль графика и инструменты для диагностики.",
+    donateBtn: "На кофе",
+    donateBtnAria: "Поддержать автора",
     topBlocksTitle: "Блоки вверху приложения",
     topBlocksSub: "Можно выбрать только 2 блока.",
+    topBlocksCalendarModeTitle: "Календарный режим периодов",
+    topBlocksCalendarModeSub: "Для верхних блоков считать значения от начала суток, недели и месяца вместо плавающего окна.",
+    topBlocksCalendarCompareModeTitle: "Считать процент по полному прошлому периоду",
+    topBlocksCalendarCompareModeSub: "Если включено, процент и подсказка считаются относительно всего прошлого дня, прошлой недели или прошлого месяца.",
     themesTitle: "Цвета",
     themesSub: "Четыре базовые темы: светлая палитра 3DDD, глубокая Navy, нейтральная Dark и нежная Pinky.",
     themeLightMetric: "Заработано сегодня",
@@ -128,6 +139,8 @@ const I18N = {
     avgLineSub: "Показывать усредняющую линию поверх основного графика.",
     trendLineTitle: "Включить линию тренда",
     trendLineSub: "Показывает общее направление графика за выбранный период: рост, снижение или стабильность.",
+    splitSiteLinesTitle: "Разделить линии 3DDD и 3DSky",
+    splitSiteLinesSub: "Показывает две отдельные линии дохода: одну для 3DDD и голубую для 3DSky.",
     toggleMutualHint: "Среднюю линию и линию тренда нельзя включить одновременно.",
     autoRefreshTitle: "Автообновление",
     autoRefreshSub: "Автообновление последних данных",
@@ -197,20 +210,45 @@ const I18N = {
     noData: "Нет данных",
     salesWord: "продаж",
     siteSplitTitle: "Продаж за 30 дней",
+    siteSplitTitleCalendar: "Продаж за месяц",
     nextRankTitle: "Продаж до следующего уровня",
     currentRank: "Текущий",
     maxRank: "Максимум",
     maxReached: "Круче некуда!",
     totalSales: "всего продаж",
     todayRevenue: "Заработано сегодня",
+    todayRevenueRolling: "Заработано за 24 часа",
     weekRevenue: "Заработано за 7 дней",
+    weekRevenueCalendar: "Заработано за неделю",
     monthRevenue: "Заработано за 30 дней",
+    monthRevenueCalendar: "Заработано за месяц",
     ytdRevenue: "Заработано с начала года",
     topModel30: "Топ модель за 30 дней",
     topModel7: "Топ модель за 7 дней",
-    vsPrevDay: "к предыдущим суткам",
+    topModel30Calendar: "Топ модель за месяц",
+    topModel7Calendar: "Топ модель за неделю",
+    vsPrevDay: "к предыдущим 24 часам",
     vsPrev7d: "к предыдущим 7 дням",
     vsPrev30d: "к предыдущим 30 дням",
+    previousDay: "За предыдущие 24 часа",
+    previousCalendarDay: "За этот же отрезок вчерашнего дня",
+    previousCalendarWeek: "За этот же отрезок прошлой недели",
+    previousCalendarMonth: "За этот же отрезок прошлого месяца",
+    previousTopCalendarWeek: "У этой модели за этот же отрезок прошлой недели",
+    previousTopCalendarMonth: "У этой модели за этот же отрезок прошлого месяца",
+    previousFullCalendarDay: "За вчерашний день",
+    previousFullCalendarWeek: "За прошлую неделю",
+    previousFullCalendarMonth: "За прошлый месяц",
+    previousTopFullCalendarWeek: "У этой модели за прошлую неделю",
+    previousTopFullCalendarMonth: "У этой модели за прошлый месяц",
+    previousPeriodRevenue: "{label}: {amount}",
+    previousPeriodSales: "{label}: {count} продаж",
+    vsPrevCalendarDay: "к вчерашнему дню",
+    vsPrevCalendarWeek: "к прошлой неделе",
+    vsPrevCalendarMonth: "к прошлому месяцу",
+    vsPrevFullCalendarDay: "к вчерашнему дню",
+    vsPrevFullCalendarWeek: "к прошлой неделе",
+    vsPrevFullCalendarMonth: "к прошлому месяцу",
     avgMonthIncome: "средний доход в месяц",
     rank_normal: "Обычный статус",
     rank_amber: "Янтарь",
@@ -237,8 +275,14 @@ const I18N = {
     pageTitle: "3DStat — Settings",
     heroTitle: "App settings",
     heroSub: "This page contains the visual and diagnostic settings of the app: themes, top blocks, chart style, and debugging tools.",
+    donateBtn: "Buy me coffee",
+    donateBtnAria: "Support the author",
     topBlocksTitle: "Top blocks in the app",
     topBlocksSub: "You can select only 2 blocks.",
+    topBlocksCalendarModeTitle: "Calendar-aligned periods",
+    topBlocksCalendarModeSub: "For the top blocks, count values from the start of the day, week, and month instead of a rolling window.",
+    topBlocksCalendarCompareModeTitle: "Calculate percent from the full previous period",
+    topBlocksCalendarCompareModeSub: "If enabled, the percent and tooltip are calculated against the entire previous day, previous week, or previous month.",
     themesTitle: "Themes",
     themesSub: "Four base themes: the light 3DDD palette, deep Navy, neutral Dark, and soft Pinky.",
     themeLightMetric: "Revenue today",
@@ -254,6 +298,8 @@ const I18N = {
     avgLineSub: "Show an average line over the main chart.",
     trendLineTitle: "Enable trend line",
     trendLineSub: "Shows the overall direction of the chart for the selected period: growth, decline, or stability.",
+    splitSiteLinesTitle: "Split 3DDD and 3DSky lines",
+    splitSiteLinesSub: "Shows two separate revenue lines: one for 3DDD and a light-blue one for 3DSky.",
     toggleMutualHint: "The average line and the trend line cannot be enabled at the same time.",
     autoRefreshTitle: "Auto refresh",
     autoRefreshSub: "Automatically refresh the latest data",
@@ -323,20 +369,45 @@ const I18N = {
     noData: "No data",
     salesWord: "sales",
     siteSplitTitle: "Sales for 30 days",
+    siteSplitTitleCalendar: "Sales for a month",
     nextRankTitle: "Sales to the next rank",
     currentRank: "Current",
     maxRank: "Maximum",
     maxReached: "No higher rank!",
     totalSales: "total sales",
     todayRevenue: "Revenue today",
+    todayRevenueRolling: "Revenue for 24 hours",
     weekRevenue: "Revenue for 7 days",
+    weekRevenueCalendar: "Revenue for a week",
     monthRevenue: "Revenue for 30 days",
+    monthRevenueCalendar: "Revenue for a month",
     ytdRevenue: "Revenue since the start of the year",
     topModel30: "Top model for 30 days",
     topModel7: "Top model for 7 days",
-    vsPrevDay: "vs previous day",
+    topModel30Calendar: "Top model for a month",
+    topModel7Calendar: "Top model for a week",
+    vsPrevDay: "vs previous 24 hours",
     vsPrev7d: "vs previous 7 days",
     vsPrev30d: "vs previous 30 days",
+    previousDay: "Previous 24 hours",
+    previousCalendarDay: "Same slice of yesterday",
+    previousCalendarWeek: "Same slice of the previous week",
+    previousCalendarMonth: "Same slice of the previous month",
+    previousTopCalendarWeek: "This model in the same slice of the previous week",
+    previousTopCalendarMonth: "This model in the same slice of the previous month",
+    previousFullCalendarDay: "Yesterday",
+    previousFullCalendarWeek: "Last week",
+    previousFullCalendarMonth: "Last month",
+    previousTopFullCalendarWeek: "This model last week",
+    previousTopFullCalendarMonth: "This model last month",
+    previousPeriodRevenue: "{label}: {amount}",
+    previousPeriodSales: "{label}: {count} sales",
+    vsPrevCalendarDay: "vs yesterday",
+    vsPrevCalendarWeek: "vs last week",
+    vsPrevCalendarMonth: "vs last month",
+    vsPrevFullCalendarDay: "vs yesterday",
+    vsPrevFullCalendarWeek: "vs last week",
+    vsPrevFullCalendarMonth: "vs last month",
     avgMonthIncome: "average income per month",
     rank_normal: "Regular status",
     rank_amber: "Amber",
@@ -408,6 +479,54 @@ function getModelDisplayTitle(item) {
   return titleRu || titleEn || tr("noData");
 }
 
+function getTodayRevenueTitle() {
+  return currentSettings?.topBlocksCalendarMode ? tr("todayRevenue") : tr("todayRevenueRolling");
+}
+
+function getWeekRevenueTitle() {
+  return currentSettings?.topBlocksCalendarMode ? tr("weekRevenueCalendar") : tr("weekRevenue");
+}
+
+function getMonthRevenueTitle() {
+  return currentSettings?.topBlocksCalendarMode ? tr("monthRevenueCalendar") : tr("monthRevenue");
+}
+
+function getTop7Title() {
+  return currentSettings?.topBlocksCalendarMode ? tr("topModel7Calendar") : tr("topModel7");
+}
+
+function getTop30Title() {
+  return currentSettings?.topBlocksCalendarMode ? tr("topModel30Calendar") : tr("topModel30");
+}
+
+function getSiteSplitTitle() {
+  return currentSettings?.topBlocksCalendarMode ? tr("siteSplitTitleCalendar") : tr("siteSplitTitle");
+}
+
+function isSameModelRef(a, b) {
+  const slugA = String(a?.slug || "").trim();
+  const slugB = String(b?.slug || "").trim();
+  if (slugA && slugB) return slugA === slugB;
+  const titlesA = [a?.title, a?.titleEn].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean);
+  const titlesB = [b?.title, b?.titleEn].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean);
+  return titlesA.some((value) => titlesB.includes(value));
+}
+
+function enrichTopModelMetric(metric, candidates = []) {
+  if (!metric) return null;
+  const merged = { ...metric };
+  for (const candidate of candidates) {
+    if (!candidate || !isSameModelRef(metric, candidate)) continue;
+    if (!merged.slug && candidate.slug) merged.slug = String(candidate.slug).trim();
+    if (!merged.title && candidate.title) merged.title = String(candidate.title).trim();
+    if (!merged.titleEn && candidate.titleEn) merged.titleEn = String(candidate.titleEn).trim();
+    if (!merged.img && candidate.img) merged.img = String(candidate.img).trim();
+    if (!merged.url && candidate.url) merged.url = String(candidate.url).trim();
+  }
+  if (!merged.url && merged.slug) merged.url = modelUrl(merged.slug);
+  return merged;
+}
+
 function setText(id, value) {
   const node = document.getElementById(id);
   if (node) node.textContent = value;
@@ -437,8 +556,13 @@ function applySettingsLocale() {
   document.title = tr("pageTitle");
   setText("settingsHeroTitle", tr("heroTitle"));
   setText("settingsHeroSub", tr("heroSub"));
+  setText("donateBtnText", tr("donateBtn"));
   setText("topBlocksTitle", tr("topBlocksTitle"));
   setText("topBlocksSub", tr("topBlocksSub"));
+  setText("topBlocksCalendarModeTitle", tr("topBlocksCalendarModeTitle"));
+  setText("topBlocksCalendarModeSub", tr("topBlocksCalendarModeSub"));
+  setText("topBlocksCalendarCompareModeTitle", tr("topBlocksCalendarCompareModeTitle"));
+  setText("topBlocksCalendarCompareModeSub", tr("topBlocksCalendarCompareModeSub"));
   setText("themesTitle", tr("themesTitle"));
   setText("themesSub", tr("themesSub"));
   setText("themeLightMetric", tr("themeLightMetric"));
@@ -454,6 +578,8 @@ function applySettingsLocale() {
   setText("avgLineSub", tr("avgLineSub"));
   setText("trendLineTitle", tr("trendLineTitle"));
   setText("trendLineSub", tr("trendLineSub"));
+  setText("splitSiteLinesTitle", tr("splitSiteLinesTitle"));
+  setText("splitSiteLinesSub", tr("splitSiteLinesSub"));
   setText("autoRefreshTitle", tr("autoRefreshTitle"));
   setText("autoRefreshSub", tr("autoRefreshSub"));
   setText("debugTitle", tr("debugTitle"));
@@ -473,6 +599,8 @@ function applySettingsLocale() {
   if (avgRow) avgRow.title = tr("toggleMutualHint");
   const trendRow = $("#trendLineRow");
   if (trendRow) trendRow.title = tr("toggleMutualHint");
+  const splitRow = $("#splitSiteLinesRow");
+  if (splitRow) splitRow.title = tr("toggleMutualHint");
   const autoRow = $("#autoRefreshRow");
   if (autoRow) autoRow.title = tr("inDevelopment");
   const debugLog = $("#debugLog");
@@ -483,6 +611,11 @@ function applySettingsLocale() {
   if (langButton) {
     langButton.title = tr("languageButtonTitle");
     langButton.setAttribute("aria-label", tr("languageButtonTitle"));
+  }
+  const donateButton = $("#donateBtn");
+  if (donateButton) {
+    donateButton.setAttribute("aria-label", tr("donateBtnAria"));
+    donateButton.title = tr("donateBtnAria");
   }
   const telegramButton = $("#telegramLink");
   if (telegramButton) {
@@ -535,12 +668,31 @@ function fmtMoney(n) {
   }).format(Number(n) || 0);
 }
 
+function getModelFrontendBaseUrl() {
+  return currentLanguage === "en" ? "https://3dsky.org" : "https://3ddd.ru";
+}
+
+function modelUrl(slug) {
+  const baseUrl = getModelFrontendBaseUrl();
+  if (!slug) return `${baseUrl}/3dmodels`;
+  return `${baseUrl}/3dmodels/show/${slug}/`;
+}
+
 function safeUrl(url) {
   try {
     const u = new URL(String(url || ""), "https://3ddd.ru/");
     if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
   } catch {}
   return "https://3ddd.ru/3dmodels";
+}
+
+function escapeAttr(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function pct(a, b) {
@@ -559,11 +711,30 @@ function formatDeltaBadge(value) {
   };
 }
 
-function metricCardHtml(title, amount, delta, note) {
+function formatPreviousRevenueTooltip(label, amount) {
+  return tr("previousPeriodRevenue", { label, amount: `${fmtMoney(amount)} ₽` });
+}
+
+function formatPreviousSalesTooltip(label, count) {
+  return tr("previousPeriodSales", { label, count: fmtNumber(count) });
+}
+
+function metricBadgeHtml(delta, tooltipText = "", extraClass = "") {
   const deltaCls = delta?.cls || "neutral";
   const deltaText = delta?.text || "• 0%";
   const icon = deltaCls === "down" ? "↓" : (deltaCls === "up" ? "↑" : "•");
   const hideIcon = delta?.hideIcon === true;
+  const titleAttr = tooltipText ? ` title="${escapeAttr(tooltipText)}"` : "";
+  const classSuffix = extraClass ? ` ${extraClass}` : "";
+  return `
+    <div class="metric-badge ${deltaCls}${hideIcon ? " no-icon" : ""}${classSuffix}"${titleAttr}>
+      ${hideIcon ? `<span class="metric-badge-icon metric-badge-icon-placeholder" aria-hidden="true"></span>` : `<span class="metric-badge-icon">${icon}</span>`}
+      <span>${deltaText}</span>
+    </div>
+  `;
+}
+
+function metricCardHtml(title, amount, delta, note, tooltipText = "") {
   return `
     <div class="metric-preview-card">
       <div>
@@ -574,10 +745,7 @@ function metricCardHtml(title, amount, delta, note) {
         </div>
       </div>
       <div class="metric-footer">
-        <div class="metric-badge ${deltaCls}${hideIcon ? " no-icon" : ""}">
-          ${hideIcon ? `<span class="metric-badge-icon metric-badge-icon-placeholder" aria-hidden="true"></span>` : `<span class="metric-badge-icon">${icon}</span>`}
-          <span>${deltaText}</span>
-        </div>
+        ${metricBadgeHtml(delta, tooltipText)}
         <div class="metric-note">${note}</div>
       </div>
     </div>
@@ -635,6 +803,19 @@ function normalizeSettings(input) {
   ) {
     needsSave = true;
   }
+
+  normalized.avgLine = !!normalized.avgLine;
+  normalized.trendLine = !!normalized.trendLine;
+  normalized.splitSiteLines = !!normalized.splitSiteLines;
+  if (normalized.splitSiteLines) {
+    normalized.avgLine = false;
+    normalized.trendLine = false;
+  } else if (normalized.avgLine && normalized.trendLine) {
+    normalized.trendLine = false;
+  }
+  normalized.topBlocksCalendarMode = !!normalized.topBlocksCalendarMode;
+  normalized.topBlocksCalendarCompareFullPeriod = !!normalized.topBlocksCalendarCompareFullPeriod;
+  normalized.autoRefresh = !!normalized.autoRefresh;
 
   return { settings: normalized, needsSave };
 }
@@ -741,6 +922,183 @@ function calculateRollingRevenueMetrics(objects, days) {
   };
 }
 
+function getMskPeriodStartUtcMs(period, nowMs = Date.now()) {
+  const offsetMs = 3 * 60 * 60 * 1000;
+  const shifted = new Date(nowMs + offsetMs);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const day = shifted.getUTCDate();
+  if (period === "month") {
+    return Date.UTC(year, month, 1, 0, 0, 0, 0) - offsetMs;
+  }
+  if (period === "week") {
+    const weekdayIndex = (shifted.getUTCDay() + 6) % 7;
+    return Date.UTC(year, month, day - weekdayIndex, 0, 0, 0, 0) - offsetMs;
+  }
+  return Date.UTC(year, month, day, 0, 0, 0, 0) - offsetMs;
+}
+
+function getPreviousMskPeriodStartUtcMs(period, currentStartMs) {
+  const offsetMs = 3 * 60 * 60 * 1000;
+  if (period === "week") return currentStartMs - 7 * 24 * 60 * 60 * 1000;
+  const shiftedStart = new Date(currentStartMs + offsetMs);
+  const year = shiftedStart.getUTCFullYear();
+  const month = shiftedStart.getUTCMonth();
+  const day = shiftedStart.getUTCDate();
+  if (period === "month") {
+    return Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - offsetMs;
+  }
+  return Date.UTC(year, month, day - 1, 0, 0, 0, 0) - offsetMs;
+}
+
+function getAnchoredPeriodBounds(period, nowMs = Date.now(), compareFullPeriod = false) {
+  const currentStart = getMskPeriodStartUtcMs(period, nowMs);
+  const previousStart = getPreviousMskPeriodStartUtcMs(period, currentStart);
+  const elapsedMs = Math.max(0, nowMs - currentStart);
+  return {
+    currentStart,
+    currentEnd: nowMs,
+    previousStart,
+    previousEnd: compareFullPeriod ? currentStart : (previousStart + elapsedMs)
+  };
+}
+
+function calculateAnchoredRevenueMetrics(objects, period, compareFullPeriod = false) {
+  const bounds = getAnchoredPeriodBounds(period, Date.now(), compareFullPeriod);
+  let currentSum = 0;
+  let previousSum = 0;
+
+  for (const item of objects || []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    const sum = Number(item?.royaltyAmount || 0);
+    if (time >= bounds.currentStart && time < bounds.currentEnd) currentSum += sum;
+    else if (time >= bounds.previousStart && time < bounds.previousEnd) previousSum += sum;
+  }
+
+  return {
+    currentSum,
+    previousSum,
+    deltaPct: pct(currentSum, previousSum)
+  };
+}
+
+function calculateAnchoredSiteSplitMetrics(objects, period, compareFullPeriod = false) {
+  const bounds = getAnchoredPeriodBounds(period, Date.now(), compareFullPeriod);
+  let currentCount = 0;
+  let previousCount = 0;
+  let site3ddd = 0;
+  let site3dsky = 0;
+
+  for (const item of objects || []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (time >= bounds.currentStart && time < bounds.currentEnd) {
+      currentCount += 1;
+      if (detectSaleSite(item) === "3DSky") site3dsky += 1;
+      else site3ddd += 1;
+    } else if (time >= bounds.previousStart && time < bounds.previousEnd) {
+      previousCount += 1;
+    }
+  }
+
+  return {
+    count: currentCount,
+    previousCount,
+    dddCount: site3ddd,
+    skyCount: site3dsky
+  };
+}
+
+function getSaleModelMetricKey(item) {
+  const slug = String(item?.slug || "").trim();
+  if (slug) return `slug:${slug}`;
+  const titleRu = String(item?.title || "").trim().toLowerCase();
+  const titleEn = String(item?.titleEn || "").trim().toLowerCase();
+  if (titleRu || titleEn) return `title:${titleRu || titleEn}|${titleEn || titleRu}`;
+  return "";
+}
+
+function aggregateModelSales(objects, startMs, endMs) {
+  const map = new Map();
+  for (const item of objects || []) {
+    const dt = parseDateUtcPlus3(item?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (time < startMs || time >= endMs) continue;
+    const key = getSaleModelMetricKey(item);
+    if (!key) continue;
+    const entry = map.get(key) || {
+      key,
+      slug: String(item?.slug || "").trim(),
+      title: String(item?.title || "").trim(),
+      titleEn: String(item?.titleEn || "").trim(),
+      img: String(item?.img || "").trim(),
+      url: "",
+      count: 0,
+      sum: 0
+    };
+    if (!entry.slug && item?.slug) entry.slug = String(item.slug).trim();
+    if (!entry.title && item?.title) entry.title = String(item.title).trim();
+    if (!entry.titleEn && item?.titleEn) entry.titleEn = String(item.titleEn).trim();
+    if (!entry.img && item?.img) entry.img = String(item.img).trim();
+    entry.count += 1;
+    entry.sum += Number(item?.royaltyAmount || 0);
+    entry.url = entry.slug ? modelUrl(entry.slug) : entry.url;
+    map.set(key, entry);
+  }
+  return map;
+}
+
+function calculateAnchoredTopModelMetric(objects, period, compareFullPeriod = false) {
+  const bounds = getAnchoredPeriodBounds(period, Date.now(), compareFullPeriod);
+  const currentMap = aggregateModelSales(objects, bounds.currentStart, bounds.currentEnd);
+  if (!currentMap.size) return null;
+  const previousMap = aggregateModelSales(objects, bounds.previousStart, bounds.previousEnd);
+  const best = Array.from(currentMap.values()).sort((a, b) => {
+    if (b.sum !== a.sum) return b.sum - a.sum;
+    if (b.count !== a.count) return b.count - a.count;
+    return String(a.title || "").localeCompare(String(b.title || ""));
+  })[0];
+  const previous = previousMap.get(best.key);
+  return {
+    ...best,
+    previousSum: Number(previous?.sum || 0),
+    deltaPct: pct(best.sum, Number(previous?.sum || 0))
+  };
+}
+
+function calculateTopModelPreviousRevenue(objects, item, days) {
+  if (!item) return 0;
+  const safeDays = Math.max(1, Number(days) || 1);
+  const nowMs = Date.now();
+  const windowMs = safeDays * 24 * 60 * 60 * 1000;
+  const currentStart = nowMs - windowMs;
+  const previousStart = nowMs - windowMs * 2;
+  let previousSum = 0;
+
+  for (const source of objects || []) {
+    const dt = parseDateUtcPlus3(source?.date);
+    if (!dt) continue;
+    const time = dt.getTime();
+    if (time < previousStart || time >= currentStart) continue;
+    const sameSlug = item?.url && safeUrl(item.url) === modelUrl(source?.slug || "");
+    const itemTitles = [item?.title, item?.titleEn]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    const sourceTitles = [source?.title, source?.titleEn]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    const sameTitle = itemTitles.some((title) => sourceTitles.includes(title));
+    if (!sameSlug && !sameTitle) continue;
+    previousSum += Number(source?.royaltyAmount || 0);
+  }
+
+  return previousSum;
+}
+
 function getCurrentAndNextRank(totalSales) {
   const count = Number(totalSales || 0);
   let current = RANKS[0];
@@ -838,6 +1196,33 @@ function buildTopBlockMetrics() {
   const { dashboard, objects, cards, top, stats } = getDashboardSources();
   const yearAndSite = calculateYearAndSiteMetrics(objects, dashboard);
   const monthFallback = calculateRollingRevenueMetrics(objects, 30);
+  const topBlocksCalendarMode = !!currentSettings.topBlocksCalendarMode;
+  const compareFullCalendarPeriod = !!currentSettings.topBlocksCalendarCompareFullPeriod;
+  const hasObjects = objects.length > 0;
+  const canUseCalendarObjects = topBlocksCalendarMode && objects.length > 0;
+  const todayFallback = topBlocksCalendarMode ? calculateAnchoredRevenueMetrics(objects, "day", compareFullCalendarPeriod) : calculateRollingRevenueMetrics(objects, 1);
+  const weekFallback = canUseCalendarObjects ? calculateAnchoredRevenueMetrics(objects, "week", compareFullCalendarPeriod) : calculateRollingRevenueMetrics(objects, 7);
+  const alignedMonthFallback = canUseCalendarObjects ? calculateAnchoredRevenueMetrics(objects, "month", compareFullCalendarPeriod) : monthFallback;
+  const siteSplitFallback = canUseCalendarObjects ? calculateAnchoredSiteSplitMetrics(objects, "month", compareFullCalendarPeriod) : null;
+  const top30Fallback = canUseCalendarObjects ? calculateAnchoredTopModelMetric(objects, "month", compareFullCalendarPeriod) : null;
+  const top7Fallback = canUseCalendarObjects ? calculateAnchoredTopModelMetric(objects, "week", compareFullCalendarPeriod) : null;
+  const top30Source = top?.["30d"]?.[0] || null;
+  const top7Source = top?.["7d"]?.[0] || null;
+  const dayTooltipLabel = topBlocksCalendarMode
+    ? tr(compareFullCalendarPeriod ? "previousFullCalendarDay" : "previousCalendarDay")
+    : tr("previousDay");
+  const weekTooltipLabel = topBlocksCalendarMode
+    ? tr(compareFullCalendarPeriod ? "previousFullCalendarWeek" : "previousCalendarWeek")
+    : tr("previous7d");
+  const monthTooltipLabel = topBlocksCalendarMode
+    ? tr(compareFullCalendarPeriod ? "previousFullCalendarMonth" : "previousCalendarMonth")
+    : tr("previous30d");
+  const top7TooltipLabel = topBlocksCalendarMode
+    ? tr(compareFullCalendarPeriod ? "previousTopFullCalendarWeek" : "previousTopCalendarWeek")
+    : tr("previousTop7");
+  const top30TooltipLabel = topBlocksCalendarMode
+    ? tr(compareFullCalendarPeriod ? "previousTopFullCalendarMonth" : "previousTopCalendarMonth")
+    : tr("previousTop30");
   const avgMonthYtd = yearAndSite.ytdSum / yearAndSite.elapsedMonths;
   const totalSiteSales = Math.max(1, yearAndSite.site3ddd + yearAndSite.site3dsky);
   const site3dddPct = Math.round((yearAndSite.site3ddd / totalSiteSales) * 100);
@@ -848,27 +1233,45 @@ function buildTopBlockMetrics() {
 
   return {
     today: {
-      amount: Number(cards?.today?.sum || 0),
-      delta: formatDeltaBadge(cards?.today?.deltaPct || 0)
+      amount: Number(hasObjects ? todayFallback.currentSum : (cards?.today?.sum || 0)),
+      delta: formatDeltaBadge(hasObjects ? todayFallback.deltaPct : (cards?.today?.deltaPct || 0)),
+      tooltip: formatPreviousRevenueTooltip(dayTooltipLabel, todayFallback.previousSum)
     },
     week_sales: {
-      amount: Number(cards?.week?.sum || 0),
-      delta: formatDeltaBadge(cards?.week?.deltaPct || 0)
+      amount: Number(canUseCalendarObjects ? weekFallback.currentSum : (cards?.week?.sum || 0)),
+      delta: formatDeltaBadge(canUseCalendarObjects ? weekFallback.deltaPct : (cards?.week?.deltaPct || 0)),
+      tooltip: formatPreviousRevenueTooltip(weekTooltipLabel, weekFallback.previousSum)
     },
     month_sales: {
-      amount: Number((cards?.month?.sum ?? monthFallback.currentSum ?? stats?.scales?.["30d"]?.sum) || 0),
-      delta: formatDeltaBadge((cards?.month?.deltaPct ?? monthFallback.deltaPct) || 0)
+      amount: Number((canUseCalendarObjects ? alignedMonthFallback.currentSum : (cards?.month?.sum ?? monthFallback.currentSum ?? stats?.scales?.["30d"]?.sum)) || 0),
+      delta: formatDeltaBadge((canUseCalendarObjects ? alignedMonthFallback.deltaPct : (cards?.month?.deltaPct ?? monthFallback.deltaPct)) || 0),
+      tooltip: formatPreviousRevenueTooltip(monthTooltipLabel, alignedMonthFallback.previousSum)
     },
     site_split: {
-      dddCount: yearAndSite.site3ddd,
-      skyCount: yearAndSite.site3dsky,
-      count: yearAndSite.monthSalesCount,
-      delta: formatDeltaBadge(pct(yearAndSite.monthSalesCount, yearAndSite.prevMonthSalesCount)),
-      dddPct: site3dddPct,
-      skyPct: site3dskyPct
+      dddCount: canUseCalendarObjects ? siteSplitFallback.dddCount : yearAndSite.site3ddd,
+      skyCount: canUseCalendarObjects ? siteSplitFallback.skyCount : yearAndSite.site3dsky,
+      count: canUseCalendarObjects ? siteSplitFallback.count : yearAndSite.monthSalesCount,
+      delta: formatDeltaBadge(canUseCalendarObjects ? pct(siteSplitFallback.count, siteSplitFallback.previousCount) : pct(yearAndSite.monthSalesCount, yearAndSite.prevMonthSalesCount)),
+      dddPct: canUseCalendarObjects
+        ? Math.round((siteSplitFallback.dddCount / Math.max(1, siteSplitFallback.dddCount + siteSplitFallback.skyCount)) * 100)
+        : site3dddPct,
+      skyPct: canUseCalendarObjects
+        ? 100 - Math.round((siteSplitFallback.dddCount / Math.max(1, siteSplitFallback.dddCount + siteSplitFallback.skyCount)) * 100)
+        : site3dskyPct,
+      tooltip: formatPreviousSalesTooltip(monthTooltipLabel, canUseCalendarObjects ? siteSplitFallback.previousCount : yearAndSite.prevMonthSalesCount)
     },
-    top30: top?.["30d"]?.[0] || null,
-    top7: top?.["7d"]?.[0] || null,
+    top30: (() => {
+      const item = canUseCalendarObjects
+        ? enrichTopModelMetric(top30Fallback || top30Source || null, [top30Source, ...objects])
+        : (top30Source || null);
+      return item ? { ...item, tooltip: formatPreviousRevenueTooltip(top30TooltipLabel, canUseCalendarObjects ? Number(item.previousSum || 0) : calculateTopModelPreviousRevenue(objects, item, 30)) } : null;
+    })(),
+    top7: (() => {
+      const item = canUseCalendarObjects
+        ? enrichTopModelMetric(top7Fallback || top7Source || null, [top7Source, ...objects])
+        : (top7Source || null);
+      return item ? { ...item, tooltip: formatPreviousRevenueTooltip(top7TooltipLabel, canUseCalendarObjects ? Number(item.previousSum || 0) : calculateTopModelPreviousRevenue(objects, item, 7)) } : null;
+    })(),
     year_total: {
       amount: yearAndSite.ytdSum,
       avgMonth: avgMonthYtd
@@ -905,10 +1308,7 @@ function topPreviewHtml(item, innerTitle) {
           </div>
         </div>
         <div class="top-preview-row top-preview-row-stats">
-          <div class="metric-badge ${delta.cls} top-delta">
-            <span class="metric-badge-icon">${deltaIcon}</span>
-            <span>${delta.text}</span>
-          </div>
+          ${metricBadgeHtml(delta, item?.tooltip || "", "top-delta")}
           <div class="top-sum">
             <span class="top-sum-number">${fmtMoney(sum)}</span>
             <span class="top-sum-unit">₽</span>
@@ -919,12 +1319,12 @@ function topPreviewHtml(item, innerTitle) {
   `;
 }
 
-function renderMetricChoice(value, previewTitle, amount, delta, note) {
+function renderMetricChoice(value, previewTitle, amount, delta, note, tooltipText = "") {
   return `
     <button class="choice metric-choice popup-like-choice" data-setting="top_blocks" data-value="${value}">
       ${topBlockMarkerHtml()}
       <div class="choice-title">${previewTitle}</div>
-      ${metricCardHtml(previewTitle, amount, delta, note)}
+      ${metricCardHtml(previewTitle, amount, delta, note, tooltipText)}
     </button>
   `;
 }
@@ -940,20 +1340,16 @@ function renderTopModelChoice(value, choiceTitle, item, innerTitle) {
 }
 
 function renderSiteSplitChoice(metric) {
-  const deltaIcon = metric.delta.cls === "down" ? "↓" : (metric.delta.cls === "up" ? "↑" : "•");
   return `
     <button class="choice metric-choice popup-like-choice" data-setting="top_blocks" data-value="site_split">
       ${topBlockMarkerHtml()}
       <div class="choice-title">3DDD / 3DSky</div>
       <div class="site-split-card">
-        <div class="metric-title">${tr("siteSplitTitle")}</div>
+        <div class="metric-title">${getSiteSplitTitle()}</div>
         <div class="site-split-layout">
           <div class="site-split-left">
             <div class="site-split-value">${fmtNumber(metric.count)}</div>
-            <div class="metric-badge ${metric.delta.cls} site-split-badge">
-              <span class="metric-badge-icon">${deltaIcon}</span>
-              <span>${metric.delta.text}</span>
-            </div>
+            ${metricBadgeHtml(metric.delta, metric.tooltip || "", "site-split-badge")}
           </div>
           <div class="site-split-right">
             <div
@@ -1050,14 +1446,19 @@ function renderTopBlockChoices() {
   const root = $("#topBlockChoices");
   if (!root) return;
   const m = buildTopBlockMetrics();
+  const topBlocksCalendarMode = !!currentSettings.topBlocksCalendarMode;
+  const compareFullCalendarPeriod = !!currentSettings.topBlocksCalendarCompareFullPeriod;
+  const dayNote = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "vsPrevFullCalendarDay" : "vsPrevCalendarDay") : tr("vsPrevDay");
+  const weekNote = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "vsPrevFullCalendarWeek" : "vsPrevCalendarWeek") : tr("vsPrev7d");
+  const monthNote = topBlocksCalendarMode ? tr(compareFullCalendarPeriod ? "vsPrevFullCalendarMonth" : "vsPrevCalendarMonth") : tr("vsPrev30d");
 
   root.innerHTML = `
-    ${renderMetricChoice("today", tr("todayRevenue"), m.today.amount, m.today.delta, tr("vsPrevDay"))}
-    ${renderMetricChoice("week_sales", tr("weekRevenue"), m.week_sales.amount, m.week_sales.delta, tr("vsPrev7d"))}
-    ${renderMetricChoice("month_sales", tr("monthRevenue"), m.month_sales.amount, m.month_sales.delta, tr("vsPrev30d"))}
+    ${renderMetricChoice("today", getTodayRevenueTitle(), m.today.amount, m.today.delta, dayNote, m.today.tooltip || "")}
+    ${renderMetricChoice("week_sales", getWeekRevenueTitle(), m.week_sales.amount, m.week_sales.delta, weekNote, m.week_sales.tooltip || "")}
+    ${renderMetricChoice("month_sales", getMonthRevenueTitle(), m.month_sales.amount, m.month_sales.delta, monthNote, m.month_sales.tooltip || "")}
     ${renderMetricChoice("year_total", tr("ytdRevenue"), m.year_total.amount, { cls: "neutral", text: `${fmtMoney(m.year_total.avgMonth)} ₽`, hideIcon: true }, tr("avgMonthIncome"))}
-    ${renderTopModelChoice("top30", tr("topModel30"), m.top30, tr("topModel30"))}
-    ${renderTopModelChoice("top7", tr("topModel7"), m.top7, tr("topModel7"))}
+    ${renderTopModelChoice("top30", getTop30Title(), m.top30, getTop30Title())}
+    ${renderTopModelChoice("top7", getTop7Title(), m.top7, getTop7Title())}
     ${renderSiteSplitChoice(m.site_split)}
     ${renderNextRankChoice(m.next_rank)}
   `;
@@ -1067,9 +1468,22 @@ function renderTopBlockChoices() {
 function updateToggleState() {
   const avg = $("#avgLineToggle");
   const trend = $("#trendLineToggle");
+  const topBlocksCalendarMode = $("#topBlocksCalendarModeToggle");
+  const topBlocksCalendarCompareMode = $("#topBlocksCalendarCompareModeToggle");
+  const topBlocksCalendarCompareModeRow = $("#topBlocksCalendarCompareModeRow");
   const auto = $("#autoRefreshToggle");
   if (avg) avg.checked = !!currentSettings.avgLine;
   if (trend) trend.checked = !!currentSettings.trendLine;
+  const splitSiteLines = $("#splitSiteLinesToggle");
+  if (splitSiteLines) splitSiteLines.checked = !!currentSettings.splitSiteLines;
+  if (topBlocksCalendarMode) topBlocksCalendarMode.checked = !!currentSettings.topBlocksCalendarMode;
+  if (topBlocksCalendarCompareMode) topBlocksCalendarCompareMode.checked = !!currentSettings.topBlocksCalendarCompareFullPeriod;
+  if (topBlocksCalendarCompareModeRow) {
+    topBlocksCalendarCompareModeRow.classList.toggle("is-disabled", !currentSettings.topBlocksCalendarMode);
+  }
+  if (topBlocksCalendarCompareMode) {
+    topBlocksCalendarCompareMode.disabled = !currentSettings.topBlocksCalendarMode;
+  }
   if (auto) auto.checked = !!currentSettings.autoRefresh;
 }
 
@@ -1091,17 +1505,40 @@ function clamp(value, min, max) {
 }
 
 function buildPoints(width, height) {
+  return buildPointsForSeries(width, height, PREVIEW_SERIES);
+}
+
+function buildPointsForSeries(width, height, values) {
   const plot = { left: 20, top: 22, width: width - 32, height: height - 42 };
-  const max = Math.max(...PREVIEW_SERIES, 1);
-  const min = Math.min(...PREVIEW_SERIES, 0);
+  const safeValues = Array.isArray(values) && values.length ? values : PREVIEW_SERIES;
+  const max = Math.max(...safeValues, 1);
+  const min = Math.min(...safeValues, 0);
   const span = Math.max(1, max - min);
-  const stepX = plot.width / Math.max(1, PREVIEW_SERIES.length - 1);
-  const points = PREVIEW_SERIES.map((value, index) => ({
+  const stepX = plot.width / Math.max(1, safeValues.length - 1);
+  const points = safeValues.map((value, index) => ({
     x: plot.left + stepX * index,
     y: plot.top + plot.height - ((value - min) / span) * plot.height,
     value
   }));
   return { plot, points };
+}
+
+function buildPreviewSplitSeries() {
+  const spikeIndices = new Set([5, 14, 19, 23]);
+  const skySeries = PREVIEW_SERIES.map((value, index) => {
+    const total = Math.max(0, Number(value) || 0);
+    const baseShare = spikeIndices.has(index)
+      ? 0.52 + (index % 2) * 0.06
+      : 0.18 + (index % 3) * 0.035;
+    const raw = Math.round(total * baseShare);
+    const minVisible = total > 0 ? 4 : 0;
+    return Math.max(0, Math.min(total, Math.max(minVisible, raw)));
+  });
+  const dddSeries = PREVIEW_SERIES.map((value, index) => {
+    const total = Math.max(0, Number(value) || 0);
+    return Math.max(0, total - skySeries[index]);
+  });
+  return { dddSeries, skySeries };
 }
 
 function tracePreviewPath(ctx, points, style) {
@@ -1215,81 +1652,203 @@ function drawPreviewOverlay(ctx, plot, min, span, points) {
 function drawClassicPreview(canvas) {
   const { ctx, width, height } = setupCanvas(canvas);
   ctx.clearRect(0, 0, width, height);
-  const { plot, points } = buildPoints(width, height);
-  const min = Math.min(...PREVIEW_SERIES, 0);
-  const span = Math.max(1, Math.max(...PREVIEW_SERIES, 1) - min);
+  const splitMode = !!currentSettings.splitSiteLines;
+  const { dddSeries, skySeries } = buildPreviewSplitSeries();
+  const sourceSeries = splitMode ? PREVIEW_SERIES.map((value, index) => Math.max(dddSeries[index], skySeries[index])) : PREVIEW_SERIES;
+  const { plot, points } = buildPointsForSeries(width, height, sourceSeries);
+  const min = Math.min(...sourceSeries, 0);
+  const span = Math.max(1, Math.max(...sourceSeries, 1) - min);
   drawGrid(ctx, width, height, plot);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, plot.top + plot.height);
-  ctx.lineTo(points[0].x, points[0].y);
-  tracePreviewPathFromSecond(ctx, points, "classic");
-  ctx.lineTo(plot.left + plot.width, plot.top + plot.height);
-  ctx.lineTo(plot.left, plot.top + plot.height);
-  ctx.closePath();
-  const gradient = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
-  gradient.addColorStop(0, themeColor("--chart-fill-start", "rgba(15,23,42,0.12)"));
-  gradient.addColorStop(1, themeColor("--chart-fill-end", "rgba(15,23,42,0.02)"));
-  ctx.fillStyle = gradient;
-  ctx.fill();
-  ctx.restore();
+  if (!splitMode) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, plot.top + plot.height);
+    ctx.lineTo(points[0].x, points[0].y);
+    tracePreviewPathFromSecond(ctx, points, "classic");
+    ctx.lineTo(plot.left + plot.width, plot.top + plot.height);
+    ctx.lineTo(plot.left, plot.top + plot.height);
+    ctx.closePath();
+    const gradient = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    gradient.addColorStop(0, themeColor("--chart-fill-start", "rgba(15,23,42,0.12)"));
+    gradient.addColorStop(1, themeColor("--chart-fill-end", "rgba(15,23,42,0.02)"));
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.restore();
 
-  ctx.strokeStyle = themeColor("--chart-line", "#111827");
-  ctx.lineWidth = 2.5;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  tracePreviewPath(ctx, points, "classic");
-  ctx.stroke();
+    ctx.strokeStyle = themeColor("--chart-line", "#111827");
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    tracePreviewPath(ctx, points, "classic");
+    ctx.stroke();
+  } else {
+    const dddPoints = buildPointsForSeries(width, height, dddSeries).points;
+    const skyPoints = buildPointsForSeries(width, height, skySeries).points;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(dddPoints[0].x, plot.top + plot.height);
+    ctx.lineTo(dddPoints[0].x, dddPoints[0].y);
+    tracePreviewPathFromSecond(ctx, dddPoints, "classic");
+    ctx.lineTo(dddPoints[dddPoints.length - 1].x, plot.top + plot.height);
+    ctx.closePath();
+    const dddFill = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    dddFill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.10)"));
+    dddFill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.01)"));
+    ctx.fillStyle = dddFill;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(skyPoints[0].x, plot.top + plot.height);
+    ctx.lineTo(skyPoints[0].x, skyPoints[0].y);
+    tracePreviewPathFromSecond(ctx, skyPoints, "classic");
+    ctx.lineTo(skyPoints[skyPoints.length - 1].x, plot.top + plot.height);
+    ctx.closePath();
+    const skyFill = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    skyFill.addColorStop(0, "rgba(56, 189, 248, 0.12)");
+    skyFill.addColorStop(1, "rgba(56, 189, 248, 0.015)");
+    ctx.fillStyle = skyFill;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = themeColor("--chart-line", "#111827");
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    tracePreviewPath(ctx, dddPoints, "classic");
+    ctx.stroke();
+
+    ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.lineWidth = 2.1;
+    ctx.beginPath();
+    tracePreviewPath(ctx, skyPoints, "classic");
+    ctx.stroke();
+
+    const lastDdd = dddPoints[dddPoints.length - 1];
+    const lastSky = skyPoints[skyPoints.length - 1];
+    ctx.fillStyle = themeColor("--chart-point", "#111827");
+    ctx.beginPath();
+    ctx.arc(lastDdd.x, lastDdd.y, 2.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.beginPath();
+    ctx.arc(lastSky.x, lastSky.y, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   drawPreviewOverlay(ctx, plot, min, span, points);
 
-  const last = points[points.length - 1];
-  ctx.fillStyle = themeColor("--chart-point", "#111827");
-  ctx.beginPath();
-  ctx.arc(last.x, last.y, 3.2, 0, Math.PI * 2);
-  ctx.fill();
+  if (!splitMode) {
+    const last = points[points.length - 1];
+    ctx.fillStyle = themeColor("--chart-point", "#111827");
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawSmoothPreview(canvas) {
   const { ctx, width, height } = setupCanvas(canvas);
   ctx.clearRect(0, 0, width, height);
-  const { plot, points } = buildPoints(width, height);
-  const min = Math.min(...PREVIEW_SERIES, 0);
-  const span = Math.max(1, Math.max(...PREVIEW_SERIES, 1) - min);
+  const splitMode = !!currentSettings.splitSiteLines;
+  const { dddSeries, skySeries } = buildPreviewSplitSeries();
+  const sourceSeries = splitMode ? PREVIEW_SERIES.map((value, index) => Math.max(dddSeries[index], skySeries[index])) : PREVIEW_SERIES;
+  const { plot, points } = buildPointsForSeries(width, height, sourceSeries);
+  const min = Math.min(...sourceSeries, 0);
+  const span = Math.max(1, Math.max(...sourceSeries, 1) - min);
   drawGrid(ctx, width, height, plot);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, plot.top + plot.height);
-  ctx.lineTo(points[0].x, points[0].y);
-  tracePreviewPathFromSecond(ctx, points, "smooth");
-  ctx.lineTo(plot.left + plot.width, plot.top + plot.height);
-  ctx.lineTo(plot.left, plot.top + plot.height);
-  ctx.closePath();
-  const gradient = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
-  gradient.addColorStop(0, themeColor("--chart-fill-start", "rgba(59,130,246,0.14)"));
-  gradient.addColorStop(1, themeColor("--chart-fill-end", "rgba(59,130,246,0.02)"));
-  ctx.fillStyle = gradient;
-  ctx.fill();
-  ctx.restore();
+  if (!splitMode) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, plot.top + plot.height);
+    ctx.lineTo(points[0].x, points[0].y);
+    tracePreviewPathFromSecond(ctx, points, "smooth");
+    ctx.lineTo(plot.left + plot.width, plot.top + plot.height);
+    ctx.lineTo(plot.left, plot.top + plot.height);
+    ctx.closePath();
+    const gradient = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    gradient.addColorStop(0, themeColor("--chart-fill-start", "rgba(59,130,246,0.14)"));
+    gradient.addColorStop(1, themeColor("--chart-fill-end", "rgba(59,130,246,0.02)"));
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.restore();
 
-  ctx.beginPath();
-  tracePreviewPath(ctx, points, "smooth");
-  ctx.strokeStyle = themeColor("--chart-line", "#0f172a");
-  ctx.lineWidth = 2.8;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.stroke();
+    ctx.beginPath();
+    tracePreviewPath(ctx, points, "smooth");
+    ctx.strokeStyle = themeColor("--chart-line", "#0f172a");
+    ctx.lineWidth = 2.8;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke();
+  } else {
+    const dddPoints = buildPointsForSeries(width, height, dddSeries).points;
+    const skyPoints = buildPointsForSeries(width, height, skySeries).points;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(dddPoints[0].x, plot.top + plot.height);
+    ctx.lineTo(dddPoints[0].x, dddPoints[0].y);
+    tracePreviewPathFromSecond(ctx, dddPoints, "smooth");
+    ctx.lineTo(dddPoints[dddPoints.length - 1].x, plot.top + plot.height);
+    ctx.closePath();
+    const dddFill = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    dddFill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.10)"));
+    dddFill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.01)"));
+    ctx.fillStyle = dddFill;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(skyPoints[0].x, plot.top + plot.height);
+    ctx.lineTo(skyPoints[0].x, skyPoints[0].y);
+    tracePreviewPathFromSecond(ctx, skyPoints, "smooth");
+    ctx.lineTo(skyPoints[skyPoints.length - 1].x, plot.top + plot.height);
+    ctx.closePath();
+    const skyFill = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    skyFill.addColorStop(0, "rgba(56, 189, 248, 0.12)");
+    skyFill.addColorStop(1, "rgba(56, 189, 248, 0.015)");
+    ctx.fillStyle = skyFill;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    tracePreviewPath(ctx, dddPoints, "smooth");
+    ctx.strokeStyle = themeColor("--chart-line", "#0f172a");
+    ctx.lineWidth = 2.7;
+    ctx.stroke();
+
+    ctx.beginPath();
+    tracePreviewPath(ctx, skyPoints, "smooth");
+    ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    const lastDdd = dddPoints[dddPoints.length - 1];
+    const lastSky = skyPoints[skyPoints.length - 1];
+    ctx.fillStyle = themeColor("--chart-point", "#111827");
+    ctx.beginPath();
+    ctx.arc(lastDdd.x, lastDdd.y, 2.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.beginPath();
+    ctx.arc(lastSky.x, lastSky.y, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   drawPreviewOverlay(ctx, plot, min, span, points);
 
-  const last = points[points.length - 1];
-  ctx.fillStyle = themeColor("--chart-point", "#111827");
-  ctx.beginPath();
-  ctx.arc(last.x, last.y, 3.2, 0, Math.PI * 2);
-  ctx.fill();
+  if (!splitMode) {
+    const last = points[points.length - 1];
+    ctx.fillStyle = themeColor("--chart-point", "#111827");
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawBarPreview(canvas) {
@@ -1309,22 +1868,64 @@ function drawBarPreview(canvas) {
   const max = Math.max(...values, 1);
   const gap = 6;
   const barWidth = Math.max(10, (plot.width - gap * (values.length - 1)) / values.length);
-  values.forEach((value, index) => {
-    const h = (value / max) * (plot.height - 8);
-    const x = plot.left + index * (barWidth + gap);
-    const y = plot.top + plot.height - h;
-    ctx.fillStyle = index === values.length - 1
-      ? themeColor("--chart-line", "#111827")
-      : themeColor("--mini-bar", "#d5dde7");
-    ctx.beginPath();
-    ctx.roundRect(x, y, barWidth, h, 8);
-    ctx.fill();
-  });
+  const splitMode = !!currentSettings.splitSiteLines;
+  if (!splitMode) {
+    values.forEach((value, index) => {
+      const h = (value / max) * (plot.height - 8);
+      const x = plot.left + index * (barWidth + gap);
+      const y = plot.top + plot.height - h;
+      ctx.fillStyle = index === values.length - 1
+        ? themeColor("--chart-line", "#111827")
+        : themeColor("--mini-bar", "#d5dde7");
+      ctx.beginPath();
+      ctx.roundRect(x, y, barWidth, h, 8);
+      ctx.fill();
+    });
+  }
 
   const barPoints = values.map((value, index) => ({
     x: plot.left + index * (barWidth + gap) + barWidth / 2,
     y: plot.top + plot.height - ((value - 0) / Math.max(1, max - 0)) * (plot.height - 8)
   }));
+
+  if (splitMode) {
+    const skyValues = values.map((value, index) => Math.max(0, value * (0.24 + (index % 3) * 0.05)));
+    const dddValues = values.map((value, index) => Math.max(0, value - skyValues[index]));
+    values.forEach((value, index) => {
+      const x = plot.left + index * (barWidth + gap);
+      const dddHeight = (dddValues[index] / max) * (plot.height - 8);
+      const skyHeight = (skyValues[index] / max) * (plot.height - 8);
+      const dddY = plot.top + plot.height - dddHeight;
+      const skyY = plot.top + plot.height - skyHeight;
+      const isLast = index === values.length - 1;
+      const bars = [
+        {
+          value: dddValues[index],
+          y: dddY,
+          h: dddHeight,
+          fill: isLast ? themeColor("--chart-line", "#111827") : themeColor("--mini-bar", "#d5dde7"),
+          alpha: isLast ? 1 : 0.96
+        },
+        {
+          value: skyValues[index],
+          y: skyY,
+          h: skyHeight,
+          fill: isLast ? themeColor("--chart-sky-line", "#38bdf8") : "rgba(56, 189, 248, 0.32)",
+          alpha: isLast ? 0.96 : 0.82
+        }
+      ].sort((a, b) => b.value - a.value);
+      bars.forEach((bar) => {
+        ctx.save();
+        ctx.globalAlpha = bar.alpha;
+        ctx.fillStyle = bar.fill;
+        ctx.beginPath();
+        ctx.roundRect(x, bar.y, barWidth, Math.max(2, bar.h), 8);
+        ctx.fill();
+        ctx.restore();
+      });
+    });
+  }
+
   drawPreviewOverlay(ctx, plot, min, span, barPoints);
 }
 
@@ -1339,48 +1940,85 @@ function renderChartPreviews() {
 
 // ===== Settings interactions =====
 function bindChoices() {
-  document.querySelectorAll(".choice[data-setting]").forEach((node) => {
-    node.addEventListener("click", async () => {
-      const key = node.dataset.setting;
-      const value = node.dataset.value;
-      if (key === "top_blocks") {
-        const selected = Array.isArray(currentSettings.top_blocks) ? [...currentSettings.top_blocks] : [];
-        const existingIndex = selected.indexOf(value);
-        if (existingIndex >= 0) {
-          selected.splice(existingIndex, 1);
-          await persistSettings({ top_blocks: selected });
-          updateTopBlockState();
-          return;
-        }
-        if (selected.length >= 2) {
-          flashSaved(tr("topBlockLimit"));
-          updateTopBlockState();
-          return;
-        }
-        selected.push(value);
+  if (choicesBound) return;
+  choicesBound = true;
+  document.addEventListener("click", async (event) => {
+    const node = event.target instanceof Element ? event.target.closest(".choice[data-setting]") : null;
+    if (!node) return;
+    const key = node.dataset.setting;
+    const value = node.dataset.value;
+    if (!key) return;
+
+    if (key === "top_blocks") {
+      const selected = Array.isArray(currentSettings.top_blocks) ? [...currentSettings.top_blocks] : [];
+      const existingIndex = selected.indexOf(value);
+      if (existingIndex >= 0) {
+        selected.splice(existingIndex, 1);
         await persistSettings({ top_blocks: selected });
         updateTopBlockState();
         return;
       }
-      await persistSettings({ [key]: value });
-      updateChoiceState();
-    });
+      if (selected.length >= 2) {
+        flashSaved(tr("topBlockLimit"));
+        updateTopBlockState();
+        return;
+      }
+      selected.push(value);
+      await persistSettings({ top_blocks: selected });
+      updateTopBlockState();
+      return;
+    }
+
+    await persistSettings({ [key]: value });
+    updateChoiceState();
   });
 }
 
 function bindToggles() {
   $("#avgLineToggle")?.addEventListener("change", async (e) => {
     const checked = !!e.target.checked;
-    const patch = checked ? { avgLine: true, trendLine: false } : { avgLine: false };
+    const patch = checked
+      ? { avgLine: true, trendLine: false, splitSiteLines: false }
+      : { avgLine: false };
     await persistSettings(patch);
     updateToggleState();
+    renderChartPreviews();
   });
 
   $("#trendLineToggle")?.addEventListener("change", async (e) => {
     const checked = !!e.target.checked;
-    const patch = checked ? { trendLine: true, avgLine: false } : { trendLine: false };
+    const patch = checked
+      ? { trendLine: true, avgLine: false, splitSiteLines: false }
+      : { trendLine: false };
     await persistSettings(patch);
     updateToggleState();
+    renderChartPreviews();
+  });
+
+  $("#splitSiteLinesToggle")?.addEventListener("change", async (e) => {
+    const checked = !!e.target.checked;
+    await persistSettings(
+      checked
+        ? { splitSiteLines: true, avgLine: false, trendLine: false }
+        : { splitSiteLines: false }
+    );
+    updateToggleState();
+    renderChartPreviews();
+  });
+
+  $("#topBlocksCalendarModeToggle")?.addEventListener("change", async (e) => {
+    const checked = !!e.target.checked;
+    await persistSettings({
+      topBlocksCalendarMode: checked,
+      topBlocksCalendarCompareFullPeriod: checked ? !!currentSettings.topBlocksCalendarCompareFullPeriod : false
+    });
+    updateToggleState();
+    refreshSettingsUI({ rerenderTopBlocks: true });
+  });
+
+  $("#topBlocksCalendarCompareModeToggle")?.addEventListener("change", async (e) => {
+    await persistSettings({ topBlocksCalendarCompareFullPeriod: !!e.target.checked });
+    refreshSettingsUI({ rerenderTopBlocks: true });
   });
 
   $("#autoRefreshToggle")?.addEventListener("change", async (e) => {
@@ -1448,6 +2086,9 @@ function buildSafeSettings(settings) {
     chart_style: safe.chart_style || null,
     avgLine: !!safe.avgLine,
     trendLine: !!safe.trendLine,
+    splitSiteLines: !!safe.splitSiteLines,
+    topBlocksCalendarMode: !!safe.topBlocksCalendarMode,
+    topBlocksCalendarCompareFullPeriod: !!safe.topBlocksCalendarCompareFullPeriod,
     autoRefresh: !!safe.autoRefresh,
     top_blocks: Array.isArray(safe.top_blocks) ? safe.top_blocks.slice(0, 2) : []
   };
@@ -1994,6 +2635,12 @@ function bindLanguageButton() {
   });
 }
 
+function bindDonateButton() {
+  $("#donateBtn")?.addEventListener("click", () => {
+    extApi.tabs.create({ url: DONATE_URL });
+  });
+}
+
 // ===== Page refresh helpers =====
 function refreshSettingsUI({ rerenderTopBlocks = false } = {}) {
   if (rerenderTopBlocks) {
@@ -2017,6 +2664,7 @@ async function initializeSettingsPage() {
   bindToggles();
   bindDebugPanel();
   bindLanguageButton();
+  bindDonateButton();
   setSaveNote(tr("themeSaved"), true);
 }
 
@@ -2045,7 +2693,7 @@ extApi.storage.onChanged.addListener((changes, areaName) => {
   }
   if (!changes[APP_SETTINGS_KEY]) return;
   applySettingsState(changes[APP_SETTINGS_KEY].newValue || {});
-  refreshSettingsUI();
+  refreshSettingsUI({ rerenderTopBlocks: true });
   setSaveNote(tr("themeSaved"), true);
 });
 

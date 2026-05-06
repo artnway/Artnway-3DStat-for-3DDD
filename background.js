@@ -2226,9 +2226,9 @@ async function fetchAllData(token) {
   }
 
   const mergedSales = mergeSalesWithWithdrawPriority(income.objects, withdraw.objects);
-  if (mergedSales.incomeOnly.length !== income.objects.length) {
-    await setIncomeCache(mergedSales.incomeOnly);
-  }
+  // Важно: не переписываем income-кэш урезанной выборкой после merge с withdraw_stat.
+  // Иначе при частичной очистке/миграции withdraw-кэша часть истории может пропасть навсегда,
+  // потому что мы уже физически удалили эти строки из income.
 
   const taggedIncome = mergedSales.incomeOnly.map(o => ({ ...o, __source: "income" }));
   const taggedWithdraw = mergedSales.withdrawOnly.map(o => ({ ...o, __source: "withdraw_stat" }));
@@ -3221,6 +3221,13 @@ async function ensureWithdrawCacheMigratedToIndexedDb() {
     const hasLocalCache = Object.keys(cacheMap || {}).length > 0;
     if (currentCount > 0) {
       if (hasLocalCache || storedIndex?.version === 2) {
+        if (hasLocalCache) {
+          // Если в IndexedDB уже есть часть записей, а в storage.local ещё лежит legacy/v2 кэш,
+          // сначала безопасно домерживаем локальные wid в IndexedDB, и только потом чистим storage.local.
+          // Иначе можно потерять старые withdraw-данные во время миграции.
+          await idbPutWithdrawEntries(cacheMap);
+          await idbSetMetaValue("withdrawCacheMergedFromLocalAt", Date.now());
+        }
         await cleanupWithdrawStatStorageCache(storedIndex);
         await setWithdrawCacheStorageSignal({ migrated: true });
       }

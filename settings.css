@@ -24,6 +24,7 @@
       display:flex;
       align-items:flex-start;
       justify-content:flex-end;
+      gap:10px;
       flex:0 0 auto;
     }
     .hero-title {
@@ -766,6 +767,10 @@
       display:grid;
       gap:12px;
     }
+    .option-list.option-list-compact {
+      margin-top:14px;
+      margin-bottom:4px;
+    }
     .toggle-row,
     .debug-summary-card,
     .debug-item,
@@ -808,6 +813,31 @@
       box-shadow:none;
     }
     .toggle-row.toggle-row-soon .slider::before {
+      box-shadow:none;
+      background:color-mix(in srgb, var(--settings-toggle-knob) 88%, var(--surface) 12%);
+    }
+    .toggle-row.toggle-row-dependent.is-disabled {
+      background:
+        repeating-linear-gradient(
+          -45deg,
+          color-mix(in srgb, var(--surface) 76%, var(--border) 24%) 0 16px,
+          color-mix(in srgb, var(--surface) 94%, transparent) 16px 32px
+        );
+      border-style:dashed;
+    }
+    .toggle-row.toggle-row-dependent.is-disabled .toggle-copy {
+      opacity:0.58;
+    }
+    .toggle-row.toggle-row-dependent.is-disabled .switch {
+      opacity:0.58;
+      cursor:not-allowed;
+    }
+    .toggle-row.toggle-row-dependent.is-disabled .slider {
+      cursor:not-allowed;
+      background:color-mix(in srgb, var(--settings-toggle-track) 78%, var(--surface) 22%);
+      box-shadow:none;
+    }
+    .toggle-row.toggle-row-dependent.is-disabled .slider::before {
       box-shadow:none;
       background:color-mix(in srgb, var(--settings-toggle-knob) 88%, var(--surface) 12%);
     }
@@ -1071,6 +1101,32 @@
       height:40px;
       padding:0 14px;
       text-align:center;
+    }
+    .donate-btn {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:40px;
+      padding:0 14px;
+      white-space:nowrap;
+    }
+    .donate-btn-icon {
+      width:18px;
+      height:18px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex:0 0 auto;
+    }
+    .donate-btn-icon svg {
+      width:18px;
+      height:18px;
+      display:block;
+      fill:none;
+      stroke:currentColor;
+      stroke-width:1.8;
+      stroke-linecap:round;
+      stroke-linejoin:round;
     }
     .footer-note {
       margin-top:18px;
