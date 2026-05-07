@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   avgLine: false,
   trendLine: false,
   splitSiteLines: false,
+  splitSiteLinesOverlaySky: false,
   previousPeriodLine: false,
   topBlocksCalendarMode: false,
   topBlocksCalendarCompareFullPeriod: false,
@@ -144,9 +145,11 @@ const I18N = {
     avgLineTitle: "Включить среднюю линию",
     avgLineSub: "Показывает усредняющую линию поверх основного графика.",
     trendLineTitle: "Включить линию тренда",
-    trendLineSub: "Показывает общее направление графика за выбранный период: рост, снижение или стабильность.",
+    trendLineSub: "Показывает направление графика: рост, падение или стабильность.",
     splitSiteLinesTitle: "Разделить линии 3DDD и 3DSky",
     splitSiteLinesSub: "Показывает две отдельные линии дохода: одну для 3DDD и голубую для 3DSky.",
+    splitSiteLinesOverlaySkyTitle: "Показать линию 3DSky",
+    splitSiteLinesOverlaySkySub: "Показывает линию 3DSky поверх общей линии.",
     previousPeriodLineTitle: "Показывать прошлый период пунктиром",
     previousPeriodLineSub: "Показывает пунктирную линию с продажами за прошлый аналогичный период.",
     toggleMutualHint: "Для графика можно выбрать только один дополнительный режим.",
@@ -312,6 +315,8 @@ const I18N = {
     trendLineSub: "Shows the overall direction of the chart for the selected period: growth, decline, or stability.",
     splitSiteLinesTitle: "Split 3DDD and 3DSky lines",
     splitSiteLinesSub: "Shows two separate revenue lines: one for 3DDD and a light-blue one for 3DSky.",
+    splitSiteLinesOverlaySkyTitle: "Show the 3DSky line",
+    splitSiteLinesOverlaySkySub: "Shows the 3DSky line over the total line.",
     previousPeriodLineTitle: "Show previous period as dashed",
     previousPeriodLineSub: "Shows a dashed line with sales for the previous comparable period.",
     toggleMutualHint: "Only one extra chart mode can be enabled at a time.",
@@ -598,6 +603,8 @@ function applySettingsLocale() {
   setText("trendLineSub", tr("trendLineSub"));
   setText("splitSiteLinesTitle", tr("splitSiteLinesTitle"));
   setText("splitSiteLinesSub", tr("splitSiteLinesSub"));
+  setText("splitSiteLinesOverlaySkyTitle", tr("splitSiteLinesOverlaySkyTitle"));
+  setText("splitSiteLinesOverlaySkySub", tr("splitSiteLinesOverlaySkySub"));
   setText("previousPeriodLineTitle", tr("previousPeriodLineTitle"));
   setText("previousPeriodLineSub", tr("previousPeriodLineSub"));
   setText("autoRefreshTitle", tr("autoRefreshTitle"));
@@ -827,8 +834,14 @@ function normalizeSettings(input) {
   normalized.avgLine = !!normalized.avgLine;
   normalized.trendLine = !!normalized.trendLine;
   normalized.splitSiteLines = !!normalized.splitSiteLines;
+  normalized.splitSiteLinesOverlaySky = !!normalized.splitSiteLinesOverlaySky;
   normalized.previousPeriodLine = !!normalized.previousPeriodLine;
   if (normalized.splitSiteLines) {
+    normalized.splitSiteLinesOverlaySky = false;
+    normalized.avgLine = false;
+    normalized.trendLine = false;
+    normalized.previousPeriodLine = false;
+  } else if (normalized.splitSiteLinesOverlaySky) {
     normalized.avgLine = false;
     normalized.trendLine = false;
     normalized.previousPeriodLine = false;
@@ -1494,6 +1507,7 @@ function updateToggleState() {
   const avg = $("#avgLineToggle");
   const trend = $("#trendLineToggle");
   const previousPeriodLine = $("#previousPeriodLineToggle");
+  const splitSiteLinesOverlaySky = $("#splitSiteLinesOverlaySkyToggle");
   const topBlocksCalendarMode = $("#topBlocksCalendarModeToggle");
   const topBlocksCalendarCompareMode = $("#topBlocksCalendarCompareModeToggle");
   const topBlocksCalendarCompareModeRow = $("#topBlocksCalendarCompareModeRow");
@@ -1502,6 +1516,7 @@ function updateToggleState() {
   if (trend) trend.checked = !!currentSettings.trendLine;
   const splitSiteLines = $("#splitSiteLinesToggle");
   if (splitSiteLines) splitSiteLines.checked = !!currentSettings.splitSiteLines;
+  if (splitSiteLinesOverlaySky) splitSiteLinesOverlaySky.checked = !!currentSettings.splitSiteLinesOverlaySky;
   if (previousPeriodLine) previousPeriodLine.checked = !!currentSettings.previousPeriodLine;
   if (topBlocksCalendarMode) topBlocksCalendarMode.checked = !!currentSettings.topBlocksCalendarMode;
   if (topBlocksCalendarCompareMode) topBlocksCalendarCompareMode.checked = !!currentSettings.topBlocksCalendarCompareFullPeriod;
@@ -1566,6 +1581,10 @@ function buildPreviewSplitSeries() {
     return Math.max(0, total - skySeries[index]);
   });
   return { dddSeries, skySeries };
+}
+
+function isSplitSkyOverlayPreview() {
+  return !!currentSettings.splitSiteLinesOverlaySky;
 }
 
 function tracePreviewPath(ctx, points, style) {
@@ -1710,14 +1729,54 @@ function drawClassicPreview(canvas) {
   const { ctx, width, height } = setupCanvas(canvas);
   ctx.clearRect(0, 0, width, height);
   const splitMode = !!currentSettings.splitSiteLines;
+  const splitOverlaySky = isSplitSkyOverlayPreview();
   const { dddSeries, skySeries } = buildPreviewSplitSeries();
-  const sourceSeries = splitMode ? PREVIEW_SERIES.map((value, index) => Math.max(dddSeries[index], skySeries[index])) : PREVIEW_SERIES;
+  const sourceSeries = splitOverlaySky
+    ? PREVIEW_SERIES
+    : splitMode
+      ? PREVIEW_SERIES.map((value, index) => Math.max(dddSeries[index], skySeries[index]))
+      : PREVIEW_SERIES;
   const { plot, points } = buildPointsForSeries(width, height, sourceSeries);
   const min = Math.min(...sourceSeries, 0);
   const span = Math.max(1, Math.max(...sourceSeries, 1) - min);
   drawGrid(ctx, width, height, plot);
 
-  if (!splitMode) {
+  if (splitOverlaySky) {
+    const totalPoints = buildPointsForSeries(width, height, PREVIEW_SERIES).points;
+    const skyPoints = buildPointsForSeries(width, height, skySeries).points;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(totalPoints[0].x, plot.top + plot.height);
+    ctx.lineTo(totalPoints[0].x, totalPoints[0].y);
+    tracePreviewPathFromSecond(ctx, totalPoints, "classic");
+    ctx.lineTo(totalPoints[totalPoints.length - 1].x, plot.top + plot.height);
+    ctx.closePath();
+    const totalFill = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    totalFill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.10)"));
+    totalFill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.01)"));
+    ctx.fillStyle = totalFill;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = themeColor("--chart-line", "#111827");
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    tracePreviewPath(ctx, totalPoints, "classic");
+    ctx.stroke();
+
+    ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.lineWidth = 2.1;
+    ctx.beginPath();
+    tracePreviewPath(ctx, skyPoints, "classic");
+    ctx.stroke();
+
+    const lastSky = skyPoints[skyPoints.length - 1];
+    ctx.fillStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.beginPath();
+    ctx.arc(lastSky.x, lastSky.y, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (!splitMode) {
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(points[0].x, plot.top + plot.height);
@@ -1798,7 +1857,7 @@ function drawClassicPreview(canvas) {
 
   drawPreviewOverlay(ctx, plot, min, span, points);
 
-  if (!splitMode) {
+  if (!splitMode || splitOverlaySky) {
     const last = points[points.length - 1];
     ctx.fillStyle = themeColor("--chart-point", "#111827");
     ctx.beginPath();
@@ -1811,14 +1870,54 @@ function drawSmoothPreview(canvas) {
   const { ctx, width, height } = setupCanvas(canvas);
   ctx.clearRect(0, 0, width, height);
   const splitMode = !!currentSettings.splitSiteLines;
+  const splitOverlaySky = isSplitSkyOverlayPreview();
   const { dddSeries, skySeries } = buildPreviewSplitSeries();
-  const sourceSeries = splitMode ? PREVIEW_SERIES.map((value, index) => Math.max(dddSeries[index], skySeries[index])) : PREVIEW_SERIES;
+  const sourceSeries = splitOverlaySky
+    ? PREVIEW_SERIES
+    : splitMode
+      ? PREVIEW_SERIES.map((value, index) => Math.max(dddSeries[index], skySeries[index]))
+      : PREVIEW_SERIES;
   const { plot, points } = buildPointsForSeries(width, height, sourceSeries);
   const min = Math.min(...sourceSeries, 0);
   const span = Math.max(1, Math.max(...sourceSeries, 1) - min);
   drawGrid(ctx, width, height, plot);
 
-  if (!splitMode) {
+  if (splitOverlaySky) {
+    const totalPoints = buildPointsForSeries(width, height, PREVIEW_SERIES).points;
+    const skyPoints = buildPointsForSeries(width, height, skySeries).points;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(totalPoints[0].x, plot.top + plot.height);
+    ctx.lineTo(totalPoints[0].x, totalPoints[0].y);
+    tracePreviewPathFromSecond(ctx, totalPoints, "smooth");
+    ctx.lineTo(totalPoints[totalPoints.length - 1].x, plot.top + plot.height);
+    ctx.closePath();
+    const totalFill = ctx.createLinearGradient(0, plot.top, 0, plot.top + plot.height);
+    totalFill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.10)"));
+    totalFill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.01)"));
+    ctx.fillStyle = totalFill;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    tracePreviewPath(ctx, totalPoints, "smooth");
+    ctx.strokeStyle = themeColor("--chart-line", "#0f172a");
+    ctx.lineWidth = 2.7;
+    ctx.stroke();
+
+    ctx.beginPath();
+    tracePreviewPath(ctx, skyPoints, "smooth");
+    ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    const lastSky = skyPoints[skyPoints.length - 1];
+    ctx.fillStyle = themeColor("--chart-sky-line", "#38bdf8");
+    ctx.beginPath();
+    ctx.arc(lastSky.x, lastSky.y, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (!splitMode) {
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(points[0].x, plot.top + plot.height);
@@ -1899,7 +1998,7 @@ function drawSmoothPreview(canvas) {
 
   drawPreviewOverlay(ctx, plot, min, span, points);
 
-  if (!splitMode) {
+  if (!splitMode || splitOverlaySky) {
     const last = points[points.length - 1];
     ctx.fillStyle = themeColor("--chart-point", "#111827");
     ctx.beginPath();
@@ -1926,14 +2025,15 @@ function drawBarPreview(canvas) {
   const gap = 6;
   const barWidth = Math.max(10, (plot.width - gap * (values.length - 1)) / values.length);
   const splitMode = !!currentSettings.splitSiteLines;
-  if (!splitMode) {
+  const splitOverlaySky = isSplitSkyOverlayPreview();
+  if (!splitMode || splitOverlaySky) {
     values.forEach((value, index) => {
       const h = (value / max) * (plot.height - 8);
       const x = plot.left + index * (barWidth + gap);
       const y = plot.top + plot.height - h;
       ctx.fillStyle = index === values.length - 1
         ? themeColor("--chart-line", "#111827")
-        : themeColor("--mini-bar", "#d5dde7");
+        : themeColor("--mini-bar", "#cfd8e3");
       ctx.beginPath();
       ctx.roundRect(x, y, barWidth, h, 8);
       ctx.fill();
@@ -1945,7 +2045,7 @@ function drawBarPreview(canvas) {
     y: plot.top + plot.height - ((value - 0) / Math.max(1, max - 0)) * (plot.height - 8)
   }));
 
-  if (splitMode) {
+  if (splitMode && !splitOverlaySky) {
     const skyValues = values.map((value, index) => Math.max(0, value * (0.24 + (index % 3) * 0.05)));
     const dddValues = values.map((value, index) => Math.max(0, value - skyValues[index]));
     values.forEach((value, index) => {
@@ -1980,6 +2080,23 @@ function drawBarPreview(canvas) {
         ctx.fill();
         ctx.restore();
       });
+    });
+  }
+
+  if (splitOverlaySky) {
+    const skyValues = values.map((value, index) => Math.max(0, value * (0.24 + (index % 3) * 0.05)));
+    values.forEach((value, index) => {
+      const x = plot.left + index * (barWidth + gap);
+      const skyHeight = (skyValues[index] / max) * (plot.height - 8);
+      const skyY = plot.top + plot.height - skyHeight;
+      const isLast = index === values.length - 1;
+      ctx.save();
+      ctx.globalAlpha = isLast ? 0.96 : 0.82;
+      ctx.fillStyle = isLast ? themeColor("--chart-sky-line", "#38bdf8") : "rgba(56, 189, 248, 0.32)";
+      ctx.beginPath();
+      ctx.roundRect(x, skyY, barWidth, Math.max(2, skyHeight), 8);
+      ctx.fill();
+      ctx.restore();
     });
   }
 
@@ -2035,7 +2152,7 @@ function bindToggles() {
   $("#avgLineToggle")?.addEventListener("change", async (e) => {
     const checked = !!e.target.checked;
     const patch = checked
-      ? { avgLine: true, trendLine: false, splitSiteLines: false, previousPeriodLine: false }
+      ? { avgLine: true, trendLine: false, splitSiteLines: false, splitSiteLinesOverlaySky: false, previousPeriodLine: false }
       : { avgLine: false };
     await persistSettings(patch);
     updateToggleState();
@@ -2045,7 +2162,7 @@ function bindToggles() {
   $("#trendLineToggle")?.addEventListener("change", async (e) => {
     const checked = !!e.target.checked;
     const patch = checked
-      ? { trendLine: true, avgLine: false, splitSiteLines: false, previousPeriodLine: false }
+      ? { trendLine: true, avgLine: false, splitSiteLines: false, splitSiteLinesOverlaySky: false, previousPeriodLine: false }
       : { trendLine: false };
     await persistSettings(patch);
     updateToggleState();
@@ -2056,8 +2173,19 @@ function bindToggles() {
     const checked = !!e.target.checked;
     await persistSettings(
       checked
-        ? { splitSiteLines: true, avgLine: false, trendLine: false, previousPeriodLine: false }
+        ? { splitSiteLines: true, splitSiteLinesOverlaySky: false, avgLine: false, trendLine: false, previousPeriodLine: false }
         : { splitSiteLines: false }
+    );
+    updateToggleState();
+    renderChartPreviews();
+  });
+
+  $("#splitSiteLinesOverlaySkyToggle")?.addEventListener("change", async (e) => {
+    const checked = !!e.target.checked;
+    await persistSettings(
+      checked
+        ? { splitSiteLinesOverlaySky: true, splitSiteLines: false, avgLine: false, trendLine: false, previousPeriodLine: false }
+        : { splitSiteLinesOverlaySky: false }
     );
     updateToggleState();
     renderChartPreviews();
@@ -2067,7 +2195,7 @@ function bindToggles() {
     const checked = !!e.target.checked;
     await persistSettings(
       checked
-        ? { previousPeriodLine: true, avgLine: false, trendLine: false, splitSiteLines: false }
+        ? { previousPeriodLine: true, avgLine: false, trendLine: false, splitSiteLines: false, splitSiteLinesOverlaySky: false }
         : { previousPeriodLine: false }
     );
     updateToggleState();
@@ -2155,6 +2283,7 @@ function buildSafeSettings(settings) {
     avgLine: !!safe.avgLine,
     trendLine: !!safe.trendLine,
     splitSiteLines: !!safe.splitSiteLines,
+    splitSiteLinesOverlaySky: !!safe.splitSiteLinesOverlaySky,
     previousPeriodLine: !!safe.previousPeriodLine,
     topBlocksCalendarMode: !!safe.topBlocksCalendarMode,
     topBlocksCalendarCompareFullPeriod: !!safe.topBlocksCalendarCompareFullPeriod,

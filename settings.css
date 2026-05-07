@@ -771,6 +771,13 @@
       margin-top:14px;
       margin-bottom:4px;
     }
+    .option-list.option-list-chart {
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      align-items:start;
+    }
+    .option-list.option-list-chart #autoRefreshRow {
+      grid-column:1 / -1;
+    }
     .toggle-row,
     .debug-summary-card,
     .debug-item,
@@ -840,6 +847,9 @@
     .toggle-row.toggle-row-dependent.is-disabled .slider::before {
       box-shadow:none;
       background:color-mix(in srgb, var(--settings-toggle-knob) 88%, var(--surface) 12%);
+    }
+    .toggle-row[hidden] {
+      display:none !important;
     }
     .toggle-copy {
       min-width:0;
@@ -1193,6 +1203,9 @@
     }
     @media (max-width: 900px) {
       .debug-summary-grid {
+        grid-template-columns:1fr;
+      }
+      .option-list.option-list-chart {
         grid-template-columns:1fr;
       }
     }

@@ -35,6 +35,7 @@
       <section class="card full">
         <h2 class="card-title" id="topBlocksTitle">Блоки вверху приложения</h2>
         <p class="card-sub" id="topBlocksSub">Можно выбрать от 0 до 4 блоков.</p>
+        <div class="choice-grid blocks" id="topBlockChoices"></div>
         <div class="option-list option-list-compact">
           <div class="toggle-row" id="topBlocksCalendarModeRow">
             <div class="toggle-copy">
@@ -57,7 +58,6 @@
             </label>
           </div>
         </div>
-        <div class="choice-grid blocks" id="topBlockChoices"></div>
       </section>
 
       <section class="card full">
@@ -165,7 +165,7 @@
           </button>
         </div>
 
-        <div class="option-list">
+        <div class="option-list option-list-chart">
           <div class="toggle-row" id="avgLineRow" title="Среднюю линию и линию тренда нельзя включить одновременно.">
             <div class="toggle-copy">
               <div class="toggle-title" id="avgLineTitle">Включить среднюю линию</div>
@@ -195,6 +195,17 @@
             </div>
             <label class="switch">
               <input type="checkbox" id="splitSiteLinesToggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row" id="splitSiteLinesOverlaySkyRow">
+            <div class="toggle-copy">
+              <div class="toggle-title" id="splitSiteLinesOverlaySkyTitle">Показать линию 3DSky</div>
+              <div class="toggle-sub" id="splitSiteLinesOverlaySkySub">Показывает линию 3DSky поверх общей линии.</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="splitSiteLinesOverlaySkyToggle">
               <span class="slider"></span>
             </label>
           </div>

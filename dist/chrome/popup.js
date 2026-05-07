@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   avgLine: false,
   trendLine: false,
   splitSiteLines: false,
+  splitSiteLinesOverlaySky: false,
   previousPeriodLine: false,
   topBlocksCalendarMode: false,
   topBlocksCalendarCompareFullPeriod: false
@@ -708,8 +709,14 @@ function sanitizeAppSettings(raw = {}) {
   settings.avgLine = !!settings.avgLine;
   settings.trendLine = !!settings.trendLine;
   settings.splitSiteLines = !!settings.splitSiteLines;
+  settings.splitSiteLinesOverlaySky = !!settings.splitSiteLinesOverlaySky;
   settings.previousPeriodLine = !!settings.previousPeriodLine;
   if (settings.splitSiteLines) {
+    settings.splitSiteLinesOverlaySky = false;
+    settings.avgLine = false;
+    settings.trendLine = false;
+    settings.previousPeriodLine = false;
+  } else if (settings.splitSiteLinesOverlaySky) {
     settings.avgLine = false;
     settings.trendLine = false;
     settings.previousPeriodLine = false;
@@ -2035,12 +2042,17 @@ function drawLineChart(canvas, labels, values, options = {}) {
   const splitSeries = options?.splitSeries && Array.isArray(options.splitSeries.dddValues) && Array.isArray(options.splitSeries.skyValues)
     ? options.splitSeries
     : null;
+  const splitSeriesMode = splitSeries && options?.splitSeriesMode === "overlaySky"
+    ? "overlaySky"
+    : (splitSeries ? "split" : null);
   const previousPeriod = options?.previousPeriod && Array.isArray(options.previousPeriod.values) && options.previousPeriod.values.length === values.length
     ? options.previousPeriod
     : null;
   const previousPeriodSeries = previousPeriod?.values || null;
   const allSeriesValues = splitSeries
-    ? (splitSeries.dddValues || []).concat(splitSeries.skyValues || [])
+    ? (splitSeriesMode === "overlaySky"
+      ? values.concat(splitSeries.skyValues || [], previousPeriodSeries || [])
+      : (splitSeries.dddValues || []).concat(splitSeries.skyValues || [], previousPeriodSeries || []))
     : values.concat(previousPeriodSeries || []);
   const rawMax = Math.max(...allSeriesValues);
   const rawMin = Math.min(...allSeriesValues);
@@ -2101,7 +2113,7 @@ function drawLineChart(canvas, labels, values, options = {}) {
   if (style === "bar") {
     const gap = Math.max(2, Math.min(8, barSlotWidth * 0.22));
     const barWidth = Math.max(3, Math.min(24, barSlotWidth - gap));
-    if (splitSeries) {
+    if (splitSeries && splitSeriesMode === "split") {
       const dddPoints = [];
       const skyPoints = [];
       values.forEach((value, index) => {
@@ -2158,10 +2170,31 @@ function drawLineChart(canvas, labels, values, options = {}) {
         ctx.roundRect(x, y, barWidth, Math.max(2, barHeight), Math.min(8, barWidth / 2));
         ctx.fill();
       });
+      if (splitSeries && splitSeriesMode === "overlaySky") {
+        const skyPoints = [];
+        splitSeries.skyValues.forEach((value, index) => {
+          const x = padL + index * barSlotWidth + (barSlotWidth - barWidth) / 2;
+          const skyValue = Number(value || 0);
+          const skyHeight = ((skyValue - minV) / range) * innerH;
+          const skyY = padT + innerH - skyHeight;
+          const isSelected = index === selectedIndex;
+          skyPoints.push({ x: x + barWidth / 2, y: skyY });
+          ctx.save();
+          ctx.globalAlpha = isSelected ? 0.96 : 0.82;
+          ctx.fillStyle = isSelected
+            ? themeColor("--chart-sky-line", "#38bdf8")
+            : themeColor("--chart-sky-line-soft", "rgba(56, 189, 248, 0.42)");
+          ctx.beginPath();
+          ctx.roundRect(x, skyY, barWidth, Math.max(2, skyHeight), Math.min(8, barWidth / 2));
+          ctx.fill();
+          ctx.restore();
+        });
+        splitPoints = { totalPoints: points, skyPoints };
+      }
     }
   } else {
     ctx.save();
-    if (!splitSeries) {
+    if (!splitSeries || splitSeriesMode === "overlaySky") {
       const fill = ctx.createLinearGradient(0, padT, 0, padT + innerH);
       fill.addColorStop(0, themeColor("--chart-fill-start", "rgba(17,17,17,0.16)"));
       fill.addColorStop(1, themeColor("--chart-fill-end", "rgba(17,17,17,0.02)"));
@@ -2176,7 +2209,7 @@ function drawLineChart(canvas, labels, values, options = {}) {
     }
     ctx.restore();
 
-    if (splitSeries) {
+    if (splitSeries && splitSeriesMode === "split") {
       const dddPoints = splitSeries.dddValues.map((value, index) => ({
         x: points[index].x,
         y: valueToChartY(Number(value || 0), minV, range, padT, innerH)
@@ -2265,6 +2298,25 @@ function drawLineChart(canvas, labels, values, options = {}) {
           ctx.fill();
         });
       }
+
+      if (splitSeries && splitSeriesMode === "overlaySky") {
+        const skyPoints = splitSeries.skyValues.map((value, index) => ({
+          x: points[index].x,
+          y: valueToChartY(Number(value || 0), minV, range, padT, innerH)
+        }));
+        splitPoints = { totalPoints: points, skyPoints };
+        ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+        ctx.lineWidth = style === "smooth" ? 2.5 : 2;
+        ctx.beginPath();
+        traceSeriesPath(ctx, skyPoints, style);
+        ctx.stroke();
+
+        const lastSky = skyPoints[skyPoints.length - 1];
+        ctx.fillStyle = themeColor("--chart-sky-line", "#38bdf8");
+        ctx.beginPath();
+        ctx.arc(lastSky.x, lastSky.y, 3.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
@@ -2323,7 +2375,7 @@ function drawLineChart(canvas, labels, values, options = {}) {
     ctx.lineTo(selected.x, padT + innerH);
     ctx.stroke();
 
-    if (splitPoints?.dddPoints?.[selectedIndex] && splitPoints?.skyPoints?.[selectedIndex]) {
+    if (splitSeriesMode === "split" && splitPoints?.dddPoints?.[selectedIndex] && splitPoints?.skyPoints?.[selectedIndex]) {
       const selectedDdd = splitPoints.dddPoints[selectedIndex];
       const selectedSky = splitPoints.skyPoints[selectedIndex];
       ctx.fillStyle = themeColor("--chart-select-fill", "#ffffff");
@@ -2336,6 +2388,29 @@ function drawLineChart(canvas, labels, values, options = {}) {
       ctx.arc(selectedDdd.x, selectedDdd.y, 4.2, 0, Math.PI * 2);
       ctx.stroke();
 
+      ctx.fillStyle = themeColor("--chart-select-fill", "#ffffff");
+      ctx.beginPath();
+      ctx.arc(selectedSky.x, selectedSky.y, 5.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = themeColor("--chart-sky-line", "#38bdf8");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(selectedSky.x, selectedSky.y, 4, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (splitSeriesMode === "overlaySky" && splitPoints?.skyPoints?.[selectedIndex]) {
+      const selectedSky = splitPoints.skyPoints[selectedIndex];
+      if (style !== "bar") {
+        ctx.fillStyle = themeColor("--chart-select-fill", "#ffffff");
+        ctx.beginPath();
+        ctx.arc(selected.x, selected.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = themeColor("--chart-select-stroke", "#2f2f2f");
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(selected.x, selected.y, 4.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.fillStyle = themeColor("--chart-select-fill", "#ffffff");
       ctx.beginPath();
       ctx.arc(selectedSky.x, selectedSky.y, 5.6, 0, Math.PI * 2);
@@ -2386,6 +2461,7 @@ function drawLineChart(canvas, labels, values, options = {}) {
     averageValue,
     averageY,
     splitSeries,
+    splitSeriesMode,
     previousPeriod,
     previousPeriodSeries,
     previousPeriodPoints,
@@ -2511,11 +2587,17 @@ function syncSelectedPointTooltip(tooltip, dateEl, sumEl, renderState) {
     const skyValue = Number(renderState.splitSeries.skyValues?.[chartSelection.index] || 0);
     const dddCount = Math.max(0, Math.round(Number(renderState.splitCountSeries?.dddCounts?.[chartSelection.index] || 0)));
     const skyCount = Math.max(0, Math.round(Number(renderState.splitCountSeries?.skyCounts?.[chartSelection.index] || 0)));
-    sumEl.innerHTML = [
-      `<b>${rub(value)} (${fmtNumber(count)})</b>`,
-      `<span>3DDD: ${rub(dddValue)} (${fmtNumber(dddCount)})</span>`,
-      `<span>3DSky: ${rub(skyValue)} (${fmtNumber(skyCount)})</span>`
-    ].join("<br>");
+    sumEl.innerHTML = renderState.splitSeriesMode === "overlaySky"
+      ? [
+          `<b>${rub(value)} (${fmtNumber(count)})</b>`,
+          `<span>3DDD: ${rub(Math.max(0, value - skyValue))} (${fmtNumber(Math.max(0, count - skyCount))})</span>`,
+          `<span>3DSky: ${rub(skyValue)} (${fmtNumber(skyCount)})</span>`
+        ].join("<br>")
+      : [
+          `<b>${rub(value)} (${fmtNumber(count)})</b>`,
+          `<span>3DDD: ${rub(dddValue)} (${fmtNumber(dddCount)})</span>`,
+          `<span>3DSky: ${rub(skyValue)} (${fmtNumber(skyCount)})</span>`
+        ].join("<br>");
   } else {
     const lines = [
       tr("chartSalesValue", { value: `${rub(value)} (${fmtNumber(count)})` })
@@ -2673,7 +2755,7 @@ function getSplitLineBucketLabel(date, scale, mode) {
 }
 
 function buildSplitLineSeries(scale, adaptiveSeries, renderSeries) {
-  if (!currentAppSettings.splitSiteLines || !Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
+  if ((!currentAppSettings.splitSiteLines && !currentAppSettings.splitSiteLinesOverlaySky) || !Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
     return null;
   }
   const sourceLabels = Array.isArray(adaptiveSeries?.labels) ? adaptiveSeries.labels : [];
@@ -2712,8 +2794,13 @@ function buildSplitLineSeries(scale, adaptiveSeries, renderSeries) {
   };
 }
 
+function buildOverlaySkySeries(scale, adaptiveSeries, renderSeries) {
+  if (!currentAppSettings.splitSiteLinesOverlaySky) return null;
+  return buildSplitLineSeries(scale, adaptiveSeries, renderSeries);
+}
+
 function buildSplitCountSeries(scale, adaptiveSeries, renderSeries) {
-  if (!currentAppSettings.splitSiteLines || !Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
+  if ((!currentAppSettings.splitSiteLines && !currentAppSettings.splitSiteLinesOverlaySky) || !Array.isArray(cachedSalesObjects) || !cachedSalesObjects.length) {
     return null;
   }
   const sourceLabels = Array.isArray(adaptiveSeries?.labels) ? adaptiveSeries.labels : [];
@@ -2876,8 +2963,11 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
   const xTicks = buildXAxisTicks(renderSeries.labels, scale, renderSeries.mode);
   const selectedIndex = getChartSelectedIndex(scale);
   const avgValue = currentAppSettings.avgLine ? getAverageValue(adaptiveSeries.values) : null;
-  const splitSeries = buildSplitLineSeries(scale, adaptiveSeries, renderSeries);
+  const splitSeries = currentAppSettings.splitSiteLinesOverlaySky
+    ? buildOverlaySkySeries(scale, adaptiveSeries, renderSeries)
+    : buildSplitLineSeries(scale, adaptiveSeries, renderSeries);
   const splitCountSeries = buildSplitCountSeries(scale, adaptiveSeries, renderSeries);
+  const splitSeriesMode = currentAppSettings.splitSiteLinesOverlaySky ? "overlaySky" : "split";
   const countSeries = buildChartCountSeries(scale, adaptiveSeries, renderSeries);
   const previousPeriodSeries = buildPreviousPeriodSeries(scale, renderSeries);
   const renderState = drawLineChart($("#chart"), renderSeries.labels, renderSeries.values, {
@@ -2889,6 +2979,7 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
     selectedIndex,
     style: chartStyle,
     splitSeries,
+    splitSeriesMode,
     previousPeriod: previousPeriodSeries ? { values: previousPeriodSeries } : null
   });
   return Object.assign({}, renderState, {
@@ -2899,6 +2990,7 @@ function createChartRenderState(scale, adaptiveSeries, renderSeries, chartStyle)
     values: renderSeries.values,
     counts: countSeries,
     splitSeries,
+    splitSeriesMode: splitSeries ? splitSeriesMode : null,
     previousPeriodSeries,
     splitCountSeries
   });
