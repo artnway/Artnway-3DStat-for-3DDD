@@ -989,6 +989,31 @@ function getSaleModelMetricKey(item) {
   return "";
 }
 
+function isSameModelRef(a, b) {
+  const slugA = String(a?.slug || "").trim();
+  const slugB = String(b?.slug || "").trim();
+  if (slugA && slugB) return slugA === slugB;
+  const titlesA = [a?.title, a?.titleEn].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean);
+  const titlesB = [b?.title, b?.titleEn].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean);
+  return titlesA.some((value) => titlesB.includes(value));
+}
+
+function enrichTopModelMetric(metric, candidates = []) {
+  if (!metric) return null;
+  const merged = { ...metric };
+  for (const candidate of candidates) {
+    if (!candidate || !isSameModelRef(metric, candidate)) continue;
+    if (!merged.slug && candidate.slug) merged.slug = String(candidate.slug).trim();
+    if (!merged.title && candidate.title) merged.title = String(candidate.title).trim();
+    if (!merged.titleEn && candidate.titleEn) merged.titleEn = String(candidate.titleEn).trim();
+    const candidateImg = String(candidate?.img || candidate?.firstImage || "").trim();
+    if (!merged.img && candidateImg) merged.img = candidateImg;
+    if (!merged.url && candidate.url) merged.url = String(candidate.url).trim();
+  }
+  if (!merged.url && merged.slug) merged.url = modelUrl(merged.slug);
+  return merged;
+}
+
 function aggregateModelSales(objects, startMs, endMs) {
   const map = new Map();
   for (const item of objects || []) {
@@ -1003,7 +1028,7 @@ function aggregateModelSales(objects, startMs, endMs) {
       slug: String(item?.slug || "").trim(),
       title: String(item?.title || "").trim(),
       titleEn: String(item?.titleEn || "").trim(),
-      img: String(item?.img || "").trim(),
+      img: String(item?.img || item?.firstImage || "").trim(),
       url: "",
       count: 0,
       sum: 0
@@ -1011,7 +1036,7 @@ function aggregateModelSales(objects, startMs, endMs) {
     if (!entry.slug && item?.slug) entry.slug = String(item.slug).trim();
     if (!entry.title && item?.title) entry.title = String(item.title).trim();
     if (!entry.titleEn && item?.titleEn) entry.titleEn = String(item.titleEn).trim();
-    if (!entry.img && item?.img) entry.img = String(item.img).trim();
+    if (!entry.img && (item?.img || item?.firstImage)) entry.img = String(item?.img || item?.firstImage || "").trim();
     entry.count += 1;
     entry.sum += Number(item?.royaltyAmount || 0);
     entry.url = entry.slug ? modelUrl(entry.slug) : entry.url;
@@ -1606,12 +1631,14 @@ function buildTopBlockMetrics(data) {
       skyPct: 100 - siteSplitDddPct,
       tooltip: formatPreviousSalesTooltip(monthTooltipLabel, siteSplitPrevCount)
     },
-    top30: top30 ? Object.assign({}, top30, {
-      tooltip: formatPreviousRevenueTooltip(top30TooltipLabel, canUseCalendarObjects ? Number(top30.previousSum || 0) : calculateTopModelPreviousRevenue(objects, top30, 30))
-    }) : null,
-    top7: top7 ? Object.assign({}, top7, {
-      tooltip: formatPreviousRevenueTooltip(top7TooltipLabel, canUseCalendarObjects ? Number(top7.previousSum || 0) : calculateTopModelPreviousRevenue(objects, top7, 7))
-    }) : null,
+    top30: (() => {
+      const item = enrichTopModelMetric(top30 || null, [top?.["30d"]?.[0], ...objects]);
+      return item ? { ...item, tooltip: formatPreviousRevenueTooltip(top30TooltipLabel, canUseCalendarObjects ? Number(item.previousSum || 0) : calculateTopModelPreviousRevenue(objects, item, 30)) } : null;
+    })(),
+    top7: (() => {
+      const item = enrichTopModelMetric(top7 || null, [top?.["7d"]?.[0], ...objects]);
+      return item ? { ...item, tooltip: formatPreviousRevenueTooltip(top7TooltipLabel, canUseCalendarObjects ? Number(item.previousSum || 0) : calculateTopModelPreviousRevenue(objects, item, 7)) } : null;
+    })(),
     year_total: {
       amount: yearAndSite.ytdSum,
       avgMonth: yearAndSite.avgMonthYtd,
