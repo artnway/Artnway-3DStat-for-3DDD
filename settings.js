@@ -5,7 +5,8 @@ const UI_LANGUAGE_KEY = "uiLanguage";
 const WITHDRAW_CACHE_INDEX_KEY = "cachedWithdrawStatIndex";
 const WITHDRAW_CACHE_LEGACY_KEY = "cachedWithdrawStatById";
 const WITHDRAW_CACHE_PREFIX = "cachedWithdrawStat:";
-const DONATE_URL = "https://pay.cloudtips.ru/p/c37b73ce";
+const DONATE_URL_RU = "https://pay.cloudtips.ru/p/c37b73ce";
+const DONATE_URL_EN = "https://boosty.to/artnway/donate";
 const DEFAULT_SETTINGS = {
   theme: "ddd-light",
   themeVersion: 2,
@@ -61,6 +62,10 @@ function isPromiseLike(value) {
 
 function getChromeRuntimeLastErrorMessage() {
   return String(globalThis.chrome?.runtime?.lastError?.message || "");
+}
+
+function getDonateUrl() {
+  return currentLanguage === "en" ? DONATE_URL_EN : DONATE_URL_RU;
 }
 
 async function storageGet(keys) {
@@ -121,8 +126,8 @@ const I18N = {
     donateBtnAria: "Поддержать автора",
     topBlocksTitle: "Блоки вверху приложения",
     topBlocksSub: "Можно выбрать от 0 до 4 блоков.",
-    topBlocksCalendarModeTitle: "Календарный режим периодов",
-    topBlocksCalendarModeSub: "Для верхних блоков считать значения от начала суток, недели и месяца вместо плавающего окна.",
+    topBlocksCalendarModeTitle: "Считать верхние блоки по календарным периодам",
+    topBlocksCalendarModeSub: "Значения будут считаться от начала текущего дня, недели и месяца, а не за плавающий период.",
     topBlocksCalendarCompareModeTitle: "Считать процент по полному прошлому периоду",
     topBlocksCalendarCompareModeSub: "Если включено, процент и подсказка считаются относительно всего прошлого дня, прошлой недели или прошлого месяца.",
     themesTitle: "Цвета",
@@ -137,13 +142,13 @@ const I18N = {
     chartSmooth: "Плавная линия",
     chartBar: "Столбцы",
     avgLineTitle: "Включить среднюю линию",
-    avgLineSub: "Показывать усредняющую линию поверх основного графика.",
+    avgLineSub: "Показывает усредняющую линию поверх основного графика.",
     trendLineTitle: "Включить линию тренда",
     trendLineSub: "Показывает общее направление графика за выбранный период: рост, снижение или стабильность.",
     splitSiteLinesTitle: "Разделить линии 3DDD и 3DSky",
     splitSiteLinesSub: "Показывает две отдельные линии дохода: одну для 3DDD и голубую для 3DSky.",
     previousPeriodLineTitle: "Показывать прошлый период пунктиром",
-    previousPeriodLineSub: "Добавляет аккуратную пунктирную линию с продажами за прошлый аналогичный период.",
+    previousPeriodLineSub: "Показывает пунктирную линию с продажами за прошлый аналогичный период.",
     toggleMutualHint: "Для графика можно выбрать только один дополнительный режим.",
     autoRefreshTitle: "Автообновление",
     autoRefreshSub: "Автообновление последних данных",
@@ -286,8 +291,8 @@ const I18N = {
     donateBtnAria: "Support the author",
     topBlocksTitle: "Top blocks in the app",
     topBlocksSub: "You can select from 0 to 4 blocks.",
-    topBlocksCalendarModeTitle: "Calendar-aligned periods",
-    topBlocksCalendarModeSub: "For the top blocks, count values from the start of the day, week, and month instead of a rolling window.",
+    topBlocksCalendarModeTitle: "Calculate top blocks by calendar periods",
+    topBlocksCalendarModeSub: "Values are calculated from the start of the current day, week, and month instead of a rolling period.",
     topBlocksCalendarCompareModeTitle: "Calculate percent from the full previous period",
     topBlocksCalendarCompareModeSub: "If enabled, the percent and tooltip are calculated against the entire previous day, previous week, or previous month.",
     themesTitle: "Themes",
@@ -302,13 +307,13 @@ const I18N = {
     chartSmooth: "Smooth line",
     chartBar: "Bars",
     avgLineTitle: "Enable average line",
-    avgLineSub: "Show an average line over the main chart.",
+    avgLineSub: "Shows an average line over the main chart.",
     trendLineTitle: "Enable trend line",
     trendLineSub: "Shows the overall direction of the chart for the selected period: growth, decline, or stability.",
     splitSiteLinesTitle: "Split 3DDD and 3DSky lines",
     splitSiteLinesSub: "Shows two separate revenue lines: one for 3DDD and a light-blue one for 3DSky.",
     previousPeriodLineTitle: "Show previous period as dashed",
-    previousPeriodLineSub: "Adds a neat dashed line with sales for the previous comparable period.",
+    previousPeriodLineSub: "Shows a dashed line with sales for the previous comparable period.",
     toggleMutualHint: "Only one extra chart mode can be enabled at a time.",
     autoRefreshTitle: "Auto refresh",
     autoRefreshSub: "Automatically refresh the latest data",
@@ -2701,7 +2706,7 @@ function bindLanguageButton() {
 
 function bindDonateButton() {
   $("#donateBtn")?.addEventListener("click", () => {
-    extApi.tabs.create({ url: DONATE_URL });
+    extApi.tabs.create({ url: getDonateUrl() });
   });
 }
 
