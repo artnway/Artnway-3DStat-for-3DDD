@@ -890,7 +890,7 @@ function updateTopBlockState() {
     const value = node.dataset.value;
     const order = selected.indexOf(value);
     const active = order >= 0;
-    const locked = !active && selected.length >= 2;
+    const locked = !active && selected.length >= 4;
     const marker = node.querySelector(".block-order-indicator");
     node.classList.toggle("active", active);
     node.classList.toggle("disabled", locked);
